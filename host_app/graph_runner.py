@@ -10,6 +10,7 @@ from langchain_core.messages import (
     AIMessageChunk,
     ToolMessage,
 )
+from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.schema import EventData
 from langgraph.graph.graph import CompiledGraph
 from mcp_client import MultiMCPClient
@@ -17,7 +18,7 @@ from pydantic import BaseModel
 
 from host_app.containers import Application
 
-from .graph import make_graph
+from .graph import FullState, make_graph
 from .models import GraphUpdate, UpdateTypes
 
 
@@ -30,15 +31,23 @@ class GraphRunner:
         self.graph = graph or make_graph()
         self.mcp_client = mcp_client
 
+    def _make_runnable_config(self, thread_id: str | None = None) -> RunnableConfig:
+        return RunnableConfig(
+            configurable={"thread_id": thread_id or str(uuid.uuid4())},
+        )
+
+    async def ainvoke(self, input: BaseModel, thread_id: str | None = None) -> FullState:
+        result = await self.graph.ainvoke(input=input, config=self._make_runnable_config(thread_id))
+        return FullState.model_validate(result)
+
     async def astream_events(
         self, input: BaseModel, thread_id: str | None = None
     ) -> AsyncIterator[GraphUpdate]:
         """Run the graph, yield events converted to GraphUpdates."""
-        thread_id = thread_id or str(uuid.uuid4())
         yield GraphUpdate(type_=UpdateTypes.graph_start, data=thread_id)
         async for event in self.graph.astream_events(
             input=input,
-            config={"configurable": {"thread_id": thread_id}},
+            config=self._make_runnable_config(thread_id),
         ):
             event_type = event["event"]
             event_data: EventData = event["data"]

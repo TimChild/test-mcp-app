@@ -63,8 +63,8 @@ class LLMs(containers.DeclarativeContainer):
 class Graph(containers.DeclarativeContainer):
     config = providers.Configuration()
 
-    checkpointer = providers.Factory(MemorySaver)
-    store = providers.Factory(InMemoryStore)
+    checkpointer = providers.Singleton(MemorySaver)
+    store = providers.Singleton(InMemoryStore)
 
 
 class Application(containers.DeclarativeContainer):

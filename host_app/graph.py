@@ -53,11 +53,10 @@ async def process(
     logging.debug(f"Processing question: {question}")
 
     previous_messages: Sequence[BaseMessage] = []
-    logging.critical(f"Conversation ID: {state.conversation_id}")
+    logging.debug(f"Conversation ID: {state.conversation_id}")
     if state.conversation_id:
-        logging.critical(f"Conversation ID: {state.conversation_id}")
         found = await store.aget(namespace=("messages",), key=state.conversation_id)
-        logging.critical(f"Found: {found}")
+        logging.debug(f"Found: {found}")
         if found:
             previous_messages = messages_from_dict(found.value["messages"])
     else:
@@ -85,9 +84,6 @@ async def process(
                 input={"messages": messages}
             )
             results = messages_state["messages"]
-            print("\n\n\n --------------- \n\n\n")
-            print(type(results))
-            print(results)
             responses.extend(results)
             messages.extend(results)
             logging.debug("Got tool responses")
@@ -104,7 +100,7 @@ async def process(
         # return responses
     update = OutputState(response_messages=[AIMessage(content=f"Received: {state.question}")])
     if state.conversation_id:
-        logging.critical(f"Saving messages for conversation ID: {state.conversation_id}")
+        logging.debug(f"Saving messages for conversation ID: {state.conversation_id}")
         await store.aput(
             namespace=("messages",),
             key=state.conversation_id,
@@ -116,7 +112,8 @@ async def process(
 
 @inject
 def make_graph(
-    checkpointer: BaseCheckpointSaver | None = None, store: BaseStore | None = None
+    checkpointer: BaseCheckpointSaver | None = Provide[Application.graph.checkpointer],
+    store: BaseStore | None = Provide[Application.graph.store],
 ) -> CompiledGraph:
     checkpointer = checkpointer or MemorySaver()
     store = store or InMemoryStore()

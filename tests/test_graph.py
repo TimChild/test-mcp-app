@@ -8,8 +8,7 @@ from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.graph.graph import CompiledGraph
-from langgraph.store.base import Item
-from langgraph.store.memory import InMemoryStore
+from langgraph.store.base import BaseStore, Item
 
 from host_app.containers import Application
 from host_app.graph import InputState, OutputState, make_graph
@@ -48,8 +47,8 @@ def fake_chat_model() -> FakeChatModel:
     )
 
 
-@pytest.fixture(autouse=True)
-def container(fake_chat_model: FakeChatModel) -> Iterator[Application]:
+@pytest.fixture(autouse=True, scope="session")
+def container() -> Iterator[Application]:
     container = Application()
     container.config.from_yaml("config.yml")
     container.wire(
@@ -58,8 +57,16 @@ def container(fake_chat_model: FakeChatModel) -> Iterator[Application]:
             "host_app.graph_runner",
         ]
     )
+    yield container
+    container.unwire()
+
+
+@pytest.fixture
+def mock_chat_model(
+    container: Application, fake_chat_model: FakeChatModel
+) -> Iterator[FakeChatModel]:
     with container.llms.main_model.override(fake_chat_model):
-        yield container
+        yield fake_chat_model
 
 
 @pytest.fixture
@@ -74,8 +81,9 @@ def test_compile_graph():
     assert isinstance(graph, CompiledGraph)
 
 
-@pytest.fixture(scope="module")
-def graph() -> CompiledGraph:
+@pytest.fixture()
+def graph(mock_chat_model: FakeChatModel) -> CompiledGraph:
+    _ = mock_chat_model
     return make_graph()
 
 
@@ -112,26 +120,40 @@ async def test_astream_graph_runner(graph_runner: GraphRunner):
     assert updates[-1].type_ == UpdateTypes.graph_end
 
 
-async def test_memory_store_standalone():
-    store = InMemoryStore()
-
+async def test_memory_store_standalone(container: Application):
+    store = container.graph.store()
     before = await store.aget(namespace=("testing",), key="test")
+    assert ("testing",) in store.list_namespaces(), "Should have been created on attempted access"
     assert before is None
 
+    # Test retrieving with same `store`
     await store.aput(namespace=("testing",), key="test", value={"value": "value"})
     after = await store.aget(namespace=("testing",), key="test")
     assert isinstance(after, Item)
     assert after.value == {"value": "value"}
 
+    # Check that `store` is a singleton
+    store2 = container.graph.store()
+    after2 = await store2.aget(namespace=("testing",), key="test")
+    assert isinstance(after2, Item)
+    assert after2.value == {"value": "value"}
 
-async def test_graph_binds_tools(
-    graph_runner: GraphRunner, fake_chat_model: FakeChatModel, basic_runnable_config: RunnableConfig
-):
-    _ = await graph_runner.graph.ainvoke(
-        input=InputState(question="Hello"), config=basic_runnable_config
-    )
 
-    assert len(fake_chat_model.tools_bound) == 1, "Should bind tools once"
-    assert fake_chat_model.tools_bound[0][0].name == "test-tool", (
+async def test_graph_binds_tools(graph_runner: GraphRunner, mock_chat_model: FakeChatModel):
+    _ = await graph_runner.ainvoke(input=InputState(question="Hello"))
+
+    assert len(mock_chat_model.tools_bound) == 1, "Should bind tools once"
+    assert mock_chat_model.tools_bound[0][0].name == "test-tool", (
         "Should bind test-tool during tests"
     )
+
+
+async def test_graph_has_memory(graph_runner: GraphRunner, container: Application):
+    _ = await graph_runner.ainvoke(
+        input=InputState(question="Hello", conversation_id="test-conv-id"),
+    )
+
+    store: BaseStore = container.graph.store()
+    assert ("messages",) in store.list_namespaces()
+    value = store.get(namespace=("messages",), key="test-conv-id")
+    assert value is not None

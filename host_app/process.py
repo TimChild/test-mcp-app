@@ -3,7 +3,7 @@ import uuid
 from typing import AsyncIterator
 
 from .functional_langgraph import InputState
-from .graph import GraphRunner
+from .graph_runner import GraphRunner
 from .models import QA, GraphUpdate, UpdateTypes
 
 
@@ -18,7 +18,7 @@ async def get_response_updates(
     yield GraphUpdate(
         type_=UpdateTypes.preprocess, data=f"Length History: {len(message_history)}\n\n"
     )
-    logging.critical(f"calling with Conversation ID: {conversation_id}")
+    logging.debug(f"calling with Conversation ID: {conversation_id}")
     async for update in GraphRunner().astream_events(
         input=InputState(question=question, conversation_id=conversation_id),
         thread_id=thread_id,

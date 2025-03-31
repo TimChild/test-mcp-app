@@ -43,7 +43,7 @@ async def connect_client() -> AsyncIterator[MultiServerMCPClient]:
 
 @task
 async def call_tool(tool_call: ToolCall, tools: list[BaseTool]) -> ToolMessage:
-    logging.critical(f"Calling tool: {tool_call}")
+    logging.debug(f"Calling tool: {tool_call}")
     tool = next(tool for tool in tools if tool.name == tool_call["name"])
     tool_call_result = await tool.ainvoke(tool_call)
     assert isinstance(tool_call_result, ToolMessage)
