@@ -8,7 +8,8 @@ from langgraph.store.base import Item
 from langgraph.store.memory import InMemoryStore
 
 from host_app.containers import Application
-from host_app.graph import GraphRunner, InputState, OutputState, make_graph
+from host_app.graph import InputState, OutputState, make_graph
+from host_app.graph_runner import GraphRunner
 from host_app.models import GraphUpdate, UpdateTypes
 
 
@@ -16,7 +17,12 @@ from host_app.models import GraphUpdate, UpdateTypes
 def container() -> Application:
     container = Application()
     container.config.from_yaml("config.yml")
-    container.wire(modules=["host_app.graph"])
+    container.wire(
+        modules=[
+            "host_app.graph",
+            "host_app.graph_runner",
+        ]
+    )
     return container
 
 

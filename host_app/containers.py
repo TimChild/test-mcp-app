@@ -2,6 +2,8 @@ import logging.config
 
 from dependency_injector import containers, providers
 from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.store.memory import InMemoryStore
 from mcp_client import MultiMCPClient
 from mcp_client.multi_client import SSEConnection, StdioConnection
 
@@ -58,6 +60,13 @@ class LLMs(containers.DeclarativeContainer):
     )
 
 
+class Graph(containers.DeclarativeContainer):
+    config = providers.Configuration()
+
+    checkpointer = providers.Factory(MemorySaver)
+    store = providers.Factory(InMemoryStore)
+
+
 class Application(containers.DeclarativeContainer):
     config = providers.Configuration(yaml_files=["config.yml"])
 
@@ -76,4 +85,9 @@ class Application(containers.DeclarativeContainer):
     llms = providers.Container(
         LLMs,
         config=config.llms,
+    )
+
+    graph = providers.Container(
+        Graph,
+        config=config.graph,
     )

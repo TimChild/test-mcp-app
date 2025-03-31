@@ -1,14 +1,12 @@
 """Regular graph version of langgraph."""
 
 import logging
-import uuid
-from typing import AsyncIterator, Sequence
+from typing import Sequence
 
 from dependency_injector.wiring import Provide, inject
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
-    AIMessageChunk,
     BaseMessage,
     HumanMessage,
     SystemMessage,
@@ -16,7 +14,6 @@ from langchain_core.messages import (
     messages_from_dict,
     messages_to_dict,
 )
-from langchain_core.runnables.schema import EventData
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph
@@ -29,53 +26,7 @@ from pydantic import BaseModel
 
 from host_app.containers import Application
 
-from .models import GraphUpdate, InputState, OutputState, UpdateTypes
-
-
-class GraphRunner:
-    def __init__(
-        self, mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client]
-    ) -> None:
-        self.mcp_client = mcp_client
-        self.graph: CompiledGraph = make_graph()
-
-    async def astream_events(
-        self, input: BaseModel, thread_id: str | None = None
-    ) -> AsyncIterator[GraphUpdate]:
-        """Run the graph, yield events converted to GraphUpdates."""
-        thread_id = thread_id or str(uuid.uuid4())
-        yield GraphUpdate(type_=UpdateTypes.graph_start, data=thread_id)
-        async for event in self.graph.astream_events(
-            input=input,
-            config={"configurable": {"thread_id": thread_id}},
-        ):
-            event_type = event["event"]
-            event_data: EventData = event["data"]
-            match event_type:
-                case "on_chat_model_stream":
-                    chunk = event_data.get("chunk", None)
-                    if chunk:
-                        assert isinstance(chunk, AIMessageChunk)
-                        content = chunk.content
-                        assert isinstance(content, str)
-                        yield GraphUpdate(type_=UpdateTypes.ai_delta, delta=content)
-                case "on_chat_model_end":
-                    chunk = event_data.get("output", None)
-                    assert isinstance(chunk, AIMessage)
-                    yield GraphUpdate(type_=UpdateTypes.ai_message_end)
-                case "on_tool_start":
-                    chunk = event_data.get("input", None)
-                    assert isinstance(chunk, dict)
-                    yield GraphUpdate(type_=UpdateTypes.tool_start, name=event["name"], data=chunk)
-                case "on_tool_end":
-                    chunk = event_data.get("output", None)
-                    assert isinstance(chunk, ToolMessage)
-                    yield GraphUpdate(
-                        type_=UpdateTypes.tool_end, name=event["name"], data=str(chunk.content)
-                    )
-                case _:
-                    logging.debug(f"Ignoring event: {event_type}")
-        yield GraphUpdate(type_=UpdateTypes.graph_end)
+from .models import InputState, OutputState
 
 
 class FullState(BaseModel):
@@ -163,6 +114,7 @@ async def process(
     # return Command(update=update, goto=["tool_caller_node", "sub_assistant_caller_node"])
 
 
+@inject
 def make_graph(
     checkpointer: BaseCheckpointSaver | None = None, store: BaseStore | None = None
 ) -> CompiledGraph:
