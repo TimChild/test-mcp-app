@@ -1,0 +1,21 @@
+version: "3"
+
+dotenv: [".env"]
+
+tasks:
+  install:
+    cmds:
+      - uv sync --dev
+      - uv run pre-commit install
+
+  run:
+    cmds:
+      - uv run reflex run
+
+  test:
+    cmds:
+      - uv run pytest
+
+  watch-tests:
+    cmds:
+      - find tests host_app -type f -not -path "*/__pycache__/*" | entr uv run pytest

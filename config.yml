@@ -1,0 +1,31 @@
+core:
+  logging:
+    version: 1
+    formatters:
+      formatter:
+        format: "[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s"
+    handlers:
+      console:
+        class: "logging.StreamHandler"
+        level: "DEBUG"
+        formatter: "formatter"
+        stream: "ext://sys.stderr"
+    root:
+      level: "DEBUG"
+      handlers: ["console"]
+
+adapters:
+  # Servers as either urls or paths to python modules (not javascript for now)
+  mcp_servers:
+    example_server: "http://localhost:9090/sse"
+
+  database:
+    dsn: ":memory:"
+
+  aws:
+    access_key_id: "KEY"
+    secret_access_key: "SECRET"
+
+services:
+  auth:
+    token_ttl: 3600
