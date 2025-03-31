@@ -1,16 +1,13 @@
 import uuid
 from typing import Any
 
+import pytest
 from langchain_core.runnables import RunnableConfig
+from langgraph.graph.graph import CompiledGraph
 from langgraph.store.base import Item
 from langgraph.store.memory import InMemoryStore
-import pytest
-from dependency_injector.wiring import Provide, inject
-from langchain_mcp_adapters.client import MultiServerMCPClient
-from langgraph.graph.graph import CompiledGraph
-from mcp_client import MultiMCPClient
 
-from host_app.containers import Adapters, Application
+from host_app.containers import Application
 from host_app.graph import GraphRunner, InputState, OutputState, make_graph
 from host_app.models import GraphUpdate, UpdateTypes
 
