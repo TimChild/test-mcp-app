@@ -21,3 +21,7 @@ tasks:
   watch-tests:
     cmds:
       - find tests host_app -type f -not -path "*/__pycache__/*" | entr uv run pytest
+
+  watch-ruff:
+    cmds:
+      - find . -type f -name "*.py" -not -path "*/.venv/*" | entr uv run ruff check --fix
