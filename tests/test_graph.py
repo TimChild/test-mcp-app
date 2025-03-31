@@ -51,14 +51,30 @@ def fake_chat_model() -> FakeChatModel:
 def container() -> Iterator[Application]:
     container = Application()
     container.config.from_yaml("config.yml")
-    container.wire(
-        modules=[
-            "host_app.graph",
-            "host_app.graph_runner",
-        ]
+    with container.config.adapters.mcp_servers.override(
+        {
+            "example_server": "tests/example_server.py",
+        }
+    ):
+        container.wire(
+            modules=[
+                "host_app.graph",
+                "host_app.graph_runner",
+            ]
+        )
+        yield container
+        container.unwire()
+
+
+def test_container(container: Application):
+    """Check the container is set up correctly."""
+    assert container.config.adapters.mcp_servers()["example_server"] == "tests/example_server.py"
+    connections = container.adapters.mcp_client().connections
+    assert "example_server" in connections
+    # NOTE: connections is a dict[name, SSEConnection | StdioConnection]
+    assert "tests/example_server.py" in str(connections["example_server"]), (
+        "Should include the path somewhere"
     )
-    yield container
-    container.unwire()
 
 
 @pytest.fixture

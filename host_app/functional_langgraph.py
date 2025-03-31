@@ -9,6 +9,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
+from dependency_injector.wiring import Provide
 from langchain_core.messages import (
     AIMessage,
     BaseMessage,
@@ -18,10 +19,12 @@ from langchain_core.messages import (
     ToolMessage,
 )
 from langchain_core.tools import BaseTool
-from langchain_mcp_adapters.client import MultiServerMCPClient, SSEConnection
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.func import entrypoint, task
+from mcp_client import MultiMCPClient
+
+from host_app.containers import Application
 
 from .models import InputState, OutputState
 
@@ -34,11 +37,11 @@ Respond in markdown.
 
 
 @asynccontextmanager
-async def connect_client() -> AsyncIterator[MultiServerMCPClient]:
-    async with MultiServerMCPClient(
-        connections={"test-server": SSEConnection(transport="sse", url="http://localhost:9090/sse")}
-    ) as client:
-        yield client
+async def connect_client(
+    mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client],
+) -> AsyncIterator[MultiMCPClient]:
+    async with mcp_client:
+        yield mcp_client
 
 
 @task
@@ -58,8 +61,7 @@ async def process(inputs: InputState) -> OutputState:
     logging.debug(f"Processing question: {question}")
 
     async with connect_client() as client:
-        # NOTE: Tools are loaded immediately after initial connection in the LC implementation
-        tools = client.get_tools()
+        tools = await client.get_tools()
         model = model.bind_tools(tools)
 
         messages: list[BaseMessage] = [
