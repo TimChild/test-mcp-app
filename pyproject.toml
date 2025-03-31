@@ -38,6 +38,7 @@ mcp-client = { path = "../mcp-client" }
 [dependency-groups]
 dev = [
     "jupyterlab>=4.3.6",
+    "pre-commit>=4.2.0",
     "pytest>=8.3.5",
     "pytest-asyncio>=0.26.0",
     "pytest-pretty>=1.2.0",
