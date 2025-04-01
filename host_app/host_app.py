@@ -7,6 +7,7 @@ import reflex_chakra as rc
 from reflex.config import environment
 
 from host_app.components import chat, navbar
+from host_app.state import State
 
 from .containers import Application
 
@@ -34,6 +35,7 @@ def make_app() -> rx.App:
     container.wire(
         modules=[
             ".graph",
+            ".state",
         ]
     )
 
@@ -44,7 +46,7 @@ def make_app() -> rx.App:
             accent_color="indigo",
         ),
     )
-    app.add_page(index)
+    app.add_page(index, on_load=[State.on_load])
     return app
 
 

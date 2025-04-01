@@ -5,9 +5,14 @@ import time
 from typing import Any, AsyncIterator
 
 import reflex as rx
+from dependency_injector.wiring import Provide, inject
 from dotenv import load_dotenv
+from langchain_core.tools import BaseTool
+from mcp_client import MultiMCPClient
 from openai import OpenAI
 from reflex.event import EventType
+
+from host_app.containers import Application
 
 from .models import QA, GraphUpdate, UpdateTypes
 from .process import get_response_updates
@@ -27,6 +32,18 @@ if not os.getenv("OPENAI_API_KEY"):
 DEFAULT_CHATS = {
     "Intros": [],
 }
+
+
+class ToolInfo(rx.Base):
+    name: str
+    description: str
+
+
+class McpServerInfo(rx.Base):
+    """Information about an MCP server."""
+
+    name: str
+    tools: list[ToolInfo]
 
 
 class State(rx.State):
@@ -54,6 +71,9 @@ class State(rx.State):
 
     # New chat modal open state.
     modal_open: bool = False
+
+    # Connected MCP servers
+    mcp_servers: list[McpServerInfo] = []
 
     @rx.event
     def set_new_chat_name(self, name: str) -> None:
@@ -92,6 +112,17 @@ class State(rx.State):
             chat_name: The name of the chat.
         """
         self.current_chat = chat_name
+
+    @rx.event
+    @inject
+    async def on_load(
+        self, mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client]
+    ) -> None:
+        """Load the state."""
+        server_tools: dict[str, list[BaseTool]] = await mcp_client.get_tools_by_server()
+        for server_name, tools in server_tools.items():
+            tool_infos = [ToolInfo(name=tool.name, description=tool.description) for tool in tools]
+            self.mcp_servers.append(McpServerInfo(name=server_name, tools=tool_infos))
 
     @rx.var(cache=True)
     def chat_titles(self) -> list[str]:

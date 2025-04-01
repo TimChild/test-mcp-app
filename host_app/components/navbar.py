@@ -1,5 +1,6 @@
 import reflex as rx
 
+from host_app.models import McpServerInfo
 from host_app.state import State
 
 
@@ -84,6 +85,33 @@ def modal(trigger: rx.Component) -> rx.Component:
     )
 
 
+def connected_mcp_server_infos() -> rx.Component:
+    def render_mcp_server_info(server_info: McpServerInfo) -> rx.Component:
+        return rx.card(
+            rx.inset(rx.heading(server_info.name), side="top"),
+            rx.data_list.root(
+                rx.data_list.item(
+                    rx.data_list.label("Tools"),
+                    rx.data_list.value(
+                        rx.flex(
+                            rx.foreach(server_info.tools, lambda tool: rx.badge(tool.name)),
+                            wrap="wrap",
+                        )
+                    ),
+                )
+            ),
+        )
+
+    return rx.dialog.root(
+        rx.dialog.trigger(rx.button("MCP Servers")),
+        rx.dialog.content(
+            rx.vstack(
+                rx.foreach(State.mcp_servers, render_mcp_server_info),
+            )
+        ),
+    )
+
+
 def navbar() -> rx.Component:
     return rx.box(
         rx.hstack(
@@ -105,6 +133,7 @@ def navbar() -> rx.Component:
                 align_items="center",
             ),
             rx.hstack(
+                connected_mcp_server_infos(),
                 modal(rx.button("+ New chat")),
                 sidebar(
                     rx.button(

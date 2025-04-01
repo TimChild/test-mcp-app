@@ -41,3 +41,15 @@ class QA(rx.Base):
 
     question: str
     answer: str
+
+
+class ToolInfo(rx.Base):
+    name: str
+    description: str
+
+
+class McpServerInfo(rx.Base):
+    """Information about an MCP server."""
+
+    name: str
+    tools: list[ToolInfo]
