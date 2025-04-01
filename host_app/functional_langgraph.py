@@ -7,11 +7,12 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import AsyncIterator, Sequence
 
 from dependency_injector.wiring import Provide
 from langchain_core.messages import (
     AIMessage,
+    AnyMessage,
     BaseMessage,
     HumanMessage,
     SystemMessage,
@@ -23,10 +24,11 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.func import entrypoint, task
 from mcp_client import MultiMCPClient
+from pydantic import BaseModel
 
 from host_app.containers import Application
 
-from .models import InputState, OutputState
+from .models import InputState
 
 checkpointer = MemorySaver()
 
@@ -51,6 +53,10 @@ async def call_tool(tool_call: ToolCall, tools: list[BaseTool]) -> ToolMessage:
     tool_call_result = await tool.ainvoke(tool_call)
     assert isinstance(tool_call_result, ToolMessage)
     return tool_call_result
+
+
+class OutputState(BaseModel):
+    response_messages: Sequence[AnyMessage]
 
 
 @entrypoint(checkpointer=checkpointer)

@@ -13,9 +13,9 @@ from langgraph.store.base import BaseStore, Item
 from mcp_client import MultiMCPClient
 
 from host_app.containers import Application, config_option_to_connections
-from host_app.graph import FullState, InputState, make_graph
+from host_app.graph import FullState, make_graph
 from host_app.graph_runner import GraphRunner
-from host_app.models import GraphUpdate, UpdateTypes
+from host_app.models import GraphUpdate, InputState, UpdateTypes
 
 EXAMPLE_SERVER_CONFIG = {
     "command": "uv",
