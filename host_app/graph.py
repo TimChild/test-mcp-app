@@ -93,6 +93,7 @@ async def call_llm(
     messages: list[BaseMessage] = [
         SystemMessage(SYSTEM_PROMPT),
         *state.previous_messages,
+        *state.response_messages,
         HumanMessage(state.question),
     ]
     response: BaseMessage = await model.ainvoke(input=messages)

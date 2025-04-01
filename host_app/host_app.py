@@ -30,8 +30,7 @@ def index() -> rx.Component:
 
 def make_app() -> rx.App:
     container = Application()
-    container.config.core.init_resources()
-    container.config.adapters.init_resources()
+    container.core.init_resources()
     container.wire(
         modules=[
             ".graph",
