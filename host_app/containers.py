@@ -23,6 +23,7 @@ def config_option_to_connections(
 ) -> dict[str, StdioConnection | SSEConnection]:
     """Add the necessary fields for a full MCP connection based on uri."""
     connections: dict[str, StdioConnection | SSEConnection] = {}
+    assert isinstance(simple_config_dict, dict)
     for name, conf in simple_config_dict.items():
         if url := conf.get("url"):
             connections[name] = SSEConnection(transport="sse", url=url)

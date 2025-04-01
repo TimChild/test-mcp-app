@@ -17,6 +17,18 @@ from host_app.graph import FullState, InputState, OutputState, make_graph
 from host_app.graph_runner import GraphRunner
 from host_app.models import GraphUpdate, UpdateTypes
 
+EXAMPLE_SERVER_CONFIG = {
+    "command": "uv",
+    "args": ["run", "tests/example_server.py"],
+}
+MISSING_STDIO_SERVER_CONFIG = {
+    "command": "uv",
+    "args": ["run", "non-existent-server.py"],
+}
+MISSING_SSE_SERVER_CONFIG = {
+    "url": "https://missing-server.com",
+}
+
 
 class FakeChatModel(FakeMessagesListChatModel):
     # NOTE: list-list in-case it's called multiple times
@@ -57,14 +69,7 @@ class NotSetModel:
 def container() -> Iterator[Application]:
     container = Application()
     container.config.from_yaml("config.yml")
-    with container.config.adapters.mcp_servers.override(
-        {
-            "example_server": {
-                "command": "uv",
-                "args": ["run", "tests/example_server.py"],
-            }
-        }
-    ):
+    with container.config.adapters.mcp_servers.override({"example_server": EXAMPLE_SERVER_CONFIG}):
         with container.llms.main_model.override(NotSetModel):
             container.wire(
                 modules=[
@@ -78,7 +83,10 @@ def container() -> Iterator[Application]:
 
 def test_container(container: Application):
     """Check the container is set up correctly."""
-    assert container.config.adapters.mcp_servers()["example_server"] == "tests/example_server.py"
+    conf = container.config.adapters.mcp_servers()["example_server"]
+    assert isinstance(conf, dict)
+    assert conf["command"] == "uv"
+    assert conf["args"] == ["run", "tests/example_server.py"]
     connections = container.adapters.mcp_client().connections
     assert "example_server" in connections
     # NOTE: connections is a dict[name, SSEConnection | StdioConnection]
@@ -135,6 +143,7 @@ def graph_runner() -> GraphRunner:
     return GraphRunner()
 
 
+@pytest.mark.usefixtures("mock_chat_model")
 async def test_astream_graph_runner(graph_runner: GraphRunner):
     updates: list[GraphUpdate] = []
     async for update in graph_runner.astream_events(input=InputState(question="Hello")):
@@ -174,6 +183,7 @@ async def test_graph_binds_tools(graph_runner: GraphRunner, mock_chat_model: Fak
     )
 
 
+@pytest.mark.usefixtures("mock_chat_model")
 async def test_graph_has_memory(graph_runner: GraphRunner, container: Application):
     _ = await graph_runner.ainvoke(
         input=InputState(question="Hello", conversation_id="test-conv-id"),
@@ -188,8 +198,8 @@ async def test_graph_has_memory(graph_runner: GraphRunner, container: Applicatio
 async def test_mcp_client_with_missing_server(container: Application):
     with container.config.adapters.mcp_servers.override(
         {
-            "example_server": "non_existent.py",
-            "another_server": "https://missing-server.com",
+            "example_server": EXAMPLE_SERVER_CONFIG,
+            "missing_server": MISSING_STDIO_SERVER_CONFIG,
         }
     ):
         # mcp_client = container.adapters.mcp_client()
@@ -214,8 +224,8 @@ async def test_graph_runs_with_missing_mcp_server(
     """Should still be able to run the graph even if one of the servers is down."""
     with container.config.adapters.mcp_servers.override(
         {
-            "example_server": "non_existent.py",
-            "another_server": "https://missing-server.com",
+            "example_server": EXAMPLE_SERVER_CONFIG,
+            "missing_server": MISSING_SSE_SERVER_CONFIG,
         }
     ):
         mcp_client = container.adapters.mcp_client()
@@ -245,3 +255,36 @@ async def test_graph_with_single_tool_call(
     third_message = response.response_messages[2]
     assert isinstance(third_message, AIMessage)
     assert third_message.content == "Response after tool call"
+
+
+# async def test_graph_with_sequential_tool_calls(
+#     graph_runner: GraphRunner, mock_chat_model: FakeChatModel
+# ):
+#     tool_call1 = ToolCall(id="test-call-id1", name="test-tool", args={})
+#     tool_call2 = ToolCall(id="test-call-id2", name="test-tool", args={})
+#     mock_chat_model.responses = [
+#         AIMessage(content="", tool_calls=[tool_call1]),
+#         AIMessage(content="", tool_calls=[tool_call2]),
+#         AIMessage("Response after tool calls"),
+#     ]
+#     response: FullState = await graph_runner.ainvoke(input=InputState(question="Hello"))
+#
+#     first_message = response.response_messages[0]
+#     assert isinstance(first_message, AIMessage)
+#     assert first_message.content == ""
+#     assert len(first_message.tool_calls) == 1
+#
+#     second_message = response.response_messages[1]
+#     assert isinstance(second_message, ToolMessage)
+#
+#     third_message = response.response_messages[2]
+#     assert isinstance(third_message, AIMessage)
+#     assert third_message.content == ""
+#     assert len(third_message.tool_calls) == 1
+#
+#     fourth_message = response.response_messages[3]
+#     assert isinstance(fourth_message, ToolMessage)
+#
+#     fifth_message = response.response_messages[4]
+#     assert isinstance(fifth_message, AIMessage)
+#     assert fifth_message.content == "Response after tool calls"
