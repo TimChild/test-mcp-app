@@ -1,4 +1,5 @@
 import logging.config
+from typing import Any
 
 from dependency_injector import containers, providers
 from langchain_openai import ChatOpenAI
@@ -18,29 +19,32 @@ class Core(containers.DeclarativeContainer):
 
 
 def config_option_to_connections(
-    simple_config_dict: dict[str, str],
+    simple_config_dict: dict[str, dict[str, Any]],
 ) -> dict[str, StdioConnection | SSEConnection]:
     """Add the necessary fields for a full MCP connection based on uri."""
     connections: dict[str, StdioConnection | SSEConnection] = {}
-    for name, conn_uri in simple_config_dict.items():
-        if conn_uri.startswith("http"):
-            connections[name] = SSEConnection(transport="sse", url=conn_uri)
-        else:
+    for name, conf in simple_config_dict.items():
+        if url := conf.get("url"):
+            connections[name] = SSEConnection(transport="sse", url=url)
+        elif command := conf.get("command"):
+            args = conf.get("args", [])
+            assert isinstance(args, list)
+            assert all(isinstance(arg, str) for arg in args)
             connections[name] = StdioConnection(
                 transport="stdio",
-                command="uv",
-                args=["run", conn_uri],
+                command=command,
+                args=args,
                 env=None,
                 encoding="utf-8",
                 encoding_error_handler="strict",
             )
+        else:
+            raise ValueError(f"Invalid connection configuration: {conf}")
     return connections
 
 
 class Adapters(containers.DeclarativeContainer):
     config = providers.Configuration()
-
-    some_value = providers.Object("some value")
 
     mcp_client: providers.Factory[MultiMCPClient] = providers.Factory(
         MultiMCPClient,
@@ -69,8 +73,6 @@ class Graph(containers.DeclarativeContainer):
 
 class Application(containers.DeclarativeContainer):
     config = providers.Configuration(yaml_files=["config.yml"])
-
-    some_value = providers.Object("some value")
 
     core = providers.Container(
         Core,
