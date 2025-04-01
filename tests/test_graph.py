@@ -13,7 +13,7 @@ from langgraph.store.base import BaseStore, Item
 from mcp_client import MultiMCPClient
 
 from host_app.containers import Application, config_option_to_connections
-from host_app.graph import FullState, InputState, OutputState, make_graph
+from host_app.graph import FullState, InputState, make_graph
 from host_app.graph_runner import GraphRunner
 from host_app.models import GraphUpdate, UpdateTypes
 
@@ -126,7 +126,7 @@ async def test_invoke_graph(graph: CompiledGraph, basic_runnable_config: Runnabl
         input=InputState(question="Hello"), config=basic_runnable_config
     )
 
-    validated: OutputState = OutputState.model_validate(result)
+    validated: FullState = FullState.model_validate(result)
     assert validated.response_messages[0].content == "First response"
 
 

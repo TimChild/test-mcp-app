@@ -1,19 +1,14 @@
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Sequence
+from typing import Any
 
 import reflex as rx
-from langchain_core.messages import BaseMessage
 from pydantic import BaseModel
 
 
 class InputState(BaseModel):
     question: str
     conversation_id: str | None = None
-
-
-class OutputState(BaseModel):
-    response_messages: Sequence[BaseMessage]
 
 
 class UpdateTypes(StrEnum):

@@ -29,7 +29,7 @@ from pydantic import BaseModel
 
 from host_app.containers import Application
 
-from .models import InputState, OutputState
+from .models import InputState
 
 
 class FullState(BaseModel):
@@ -44,30 +44,6 @@ SYSTEM_PROMPT = """
 You are a chatbot operating in a developer debugging environment. You can give detailed information about any information you have access to (you do not have to worry about hiding implementation details from a user).
 Respond in markdown.
 """
-
-
-class ToolNodeInput(BaseModel):
-    response_messages: list[BaseMessage] = []
-
-
-class ToolNodeOutput(BaseModel):
-    response_messages: list[BaseMessage] = []
-
-
-@inject
-async def call_tool(
-    state: ToolNodeInput,
-    mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client],
-) -> ToolNodeOutput:
-    async with mcp_client as client:
-        tools = await client.get_tools()
-        logging.debug("Calling tools")
-        messages_state = await ToolNode(tools=tools, name="tool_node").ainvoke(
-            input={"messages": state.response_messages}
-        )
-    results = messages_state["messages"]
-    logging.debug("Got tool responses")
-    return ToolNodeOutput(response_messages=results)
 
 
 class InitializeOutput(BaseModel):
@@ -98,7 +74,6 @@ async def initialize(
 
 class CallLLMOutput(BaseModel):
     response_messages: list[BaseMessage] = []
-    tools: list[BaseTool] = []
 
 
 @inject
@@ -122,7 +97,7 @@ async def call_llm(
     ]
     response: BaseMessage = await model.ainvoke(input=messages)
     assert isinstance(response, AIMessage)
-    update = OutputState(response_messages=[response])
+    update = CallLLMOutput(response_messages=[response])
 
     if response.tool_calls:
         return Command(update=update, goto="tool_node")
@@ -135,6 +110,31 @@ async def call_llm(
             value={"messages": messages_to_dict(messages + [response])},
         )
     return Command(update=update, goto=END)
+
+
+class ToolNodeInput(BaseModel):
+    response_messages: list[BaseMessage]
+    tools: list[BaseTool]
+
+
+class ToolNodeOutput(BaseModel):
+    response_messages: list[BaseMessage]
+
+
+@inject
+async def call_tool(
+    state: ToolNodeInput,
+    mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client],
+) -> ToolNodeOutput:
+    async with mcp_client as client:
+        tools = await client.get_tools()
+        logging.debug("Calling tools")
+        messages_state = await ToolNode(tools=tools, name="tool_node").ainvoke(
+            input={"messages": state.response_messages}
+        )
+    results = messages_state["messages"]
+    logging.debug("Got tool responses")
+    return ToolNodeOutput(response_messages=results)
 
 
 @inject
