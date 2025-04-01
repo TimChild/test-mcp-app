@@ -88,7 +88,7 @@ def modal(trigger: rx.Component) -> rx.Component:
 def connected_mcp_server_infos() -> rx.Component:
     def render_mcp_server_info(server_info: McpServerInfo) -> rx.Component:
         return rx.card(
-            rx.inset(rx.heading(server_info.name), side="top"),
+            rx.inset(rx.heading(server_info.name), padding="1em", side="top"),
             rx.data_list.root(
                 rx.data_list.item(
                     rx.data_list.label("Tools"),

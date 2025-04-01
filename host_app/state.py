@@ -120,6 +120,7 @@ class State(rx.State):
     ) -> None:
         """Load the state."""
         server_tools: dict[str, list[BaseTool]] = await mcp_client.get_tools_by_server()
+        self.mcp_servers = []
         for server_name, tools in server_tools.items():
             tool_infos = [ToolInfo(name=tool.name, description=tool.description) for tool in tools]
             self.mcp_servers.append(McpServerInfo(name=server_name, tools=tool_infos))
