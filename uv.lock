@@ -1163,7 +1163,7 @@ wheels = [
 
 [[package]]
 name = "langsmith"
-version = "0.3.19"
+version = "0.3.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -1174,9 +1174,9 @@ dependencies = [
     { name = "requests-toolbelt" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7c/03/22d2235d16694c4751957f8c247e0734963be407c88a0ed2d8b9b1a3365b/langsmith-0.3.19.tar.gz", hash = "sha256:0133676689b5e1b879ed05a18e18570daf0dd05e0cefc397342656a58ebecbc5", size = 337201 }
+sdist = { url = "https://files.pythonhosted.org/packages/38/9c/6d85fe452ef4d49d323a7b3b40ec47f851fde43a21205635d3c707afeb5f/langsmith-0.3.21.tar.gz", hash = "sha256:71e30c11c6151e5fe73226d4865a78e25ac4c226c3ea7a524be5adc85ad9f97e", size = 337750 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/62/af/3e2a2498bd46e2c022e7af23c0db67ab2400be18caeb398c758d6aa1ce45/langsmith-0.3.19-py3-none-any.whl", hash = "sha256:a306962ab53562c4094192f1da964309b48aac7898f82d1d421c3fb9c3f29367", size = 351860 },
+    { url = "https://files.pythonhosted.org/packages/94/44/d062769ce2455a04a1a9f4a75cad3ac120449e849a919142d2c4310606a9/langsmith-0.3.21-py3-none-any.whl", hash = "sha256:1ff6b28a8cfb5a4ff4a45c812072f16abdbae544b5d67fa275388c504b5a73cc", size = 352409 },
 ]
 
 [[package]]
@@ -1449,7 +1449,7 @@ wheels = [
 
 [[package]]
 name = "openai"
-version = "1.69.0"
+version = "1.70.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -1461,9 +1461,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ab/99/d164612528dfb7a9b19330623daded608e75d25823b01f81e0376eb388a4/openai-1.69.0.tar.gz", hash = "sha256:7b8a10a8ff77e1ae827e5e4c8480410af2070fb68bc973d6c994cf8218f1f98d", size = 409579 }
+sdist = { url = "https://files.pythonhosted.org/packages/87/f5/ae0f3cd226c2993b4ac1cc4b5f6ca099764689f403c14922c9356accec66/openai-1.70.0.tar.gz", hash = "sha256:e52a8d54c3efeb08cf58539b5b21a5abef25368b5432965e4de88cdf4e091b2b", size = 409640 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/a4/28113be8b7bc937656aaf7b06feff7e9a5eb742ee4e405c6c48c30d879c4/openai-1.69.0-py3-none-any.whl", hash = "sha256:73c4b2ddfd050060f8d93c70367189bd891e70a5adb6d69c04c3571f4fea5627", size = 599068 },
+    { url = "https://files.pythonhosted.org/packages/e2/39/c4b38317d2c702c4bc763957735aaeaf30dfc43b5b824121c49a4ba7ba0f/openai-1.70.0-py3-none-any.whl", hash = "sha256:f6438d053fd8b2e05fd6bef70871e832d9bbdf55e119d0ac5b92726f1ae6f614", size = 599070 },
 ]
 
 [[package]]
@@ -1966,7 +1966,7 @@ wheels = [
 
 [[package]]
 name = "reflex"
-version = "0.7.4"
+version = "0.7.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -2000,9 +2000,9 @@ dependencies = [
     { name = "wheel" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/57/be/c904df8718a194f1a9579e781a2124c6238a82937e3db4041d49b64e2c9d/reflex-0.7.4.tar.gz", hash = "sha256:c08757a3240345042587ad65d8835cfb1542505e5702703ac7f571acd0fd361c", size = 551782 }
+sdist = { url = "https://files.pythonhosted.org/packages/17/22/7ed81e33e271c52f9a392536b2fd1adc6f0d7287ab0d8aaf7a99d8a789e9/reflex-0.7.5.tar.gz", hash = "sha256:5bd64d6ff6a25e218b9443b5a8774b068a47d3b47ad2135480323b6f905eb6af", size = 556492 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/65/ca/79279ebe1bd7ac235f491c4397bc968ab1a4fde5b07d1fb938769e58d948/reflex-0.7.4-py3-none-any.whl", hash = "sha256:b3f98ddd896416e19bfe225f49a4cecd6613b288f6ac197ac48a6a1c47320648", size = 839471 },
+    { url = "https://files.pythonhosted.org/packages/fc/78/89e28491c197998b7b2a9d9b290077fc66017d5a082f649edd85b11170f3/reflex-0.7.5-py3-none-any.whl", hash = "sha256:3d25833c2915729ed0c1ca6d3f8bb01e3e0aa6257fe13ad18b5810ebff55cec3", size = 845725 },
 ]
 
 [[package]]
