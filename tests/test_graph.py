@@ -5,7 +5,7 @@ from typing import Any, Callable, Iterator, Literal, Optional, Sequence, Union
 import pytest
 from langchain_core.language_models import LanguageModelInput
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
-from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage, ToolCall, ToolMessage
 from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.graph.graph import CompiledGraph
@@ -59,7 +59,10 @@ def container() -> Iterator[Application]:
     container.config.from_yaml("config.yml")
     with container.config.adapters.mcp_servers.override(
         {
-            "example_server": "tests/example_server.py",
+            "example_server": {
+                "command": "uv",
+                "args": ["run", "tests/example_server.py"],
+            }
         }
     ):
         with container.llms.main_model.override(NotSetModel):
@@ -219,3 +222,26 @@ async def test_graph_runs_with_missing_mcp_server(
         mcp_client.set_connection_timeout(0.5)
         response: FullState = await graph_runner.ainvoke(input=InputState(question="Hello"))
         assert response.response_messages[0].content == "First response"
+
+
+async def test_graph_with_single_tool_call(
+    graph_runner: GraphRunner, mock_chat_model: FakeChatModel
+):
+    tool_call = ToolCall(id="test-call-id", name="test-tool", args={})
+    mock_chat_model.responses = [
+        AIMessage(content="", tool_calls=[tool_call]),
+        AIMessage("Response after tool call"),
+    ]
+    response: FullState = await graph_runner.ainvoke(input=InputState(question="Hello"))
+
+    first_message = response.response_messages[0]
+    assert isinstance(first_message, AIMessage)
+    assert first_message.content == ""
+    assert len(first_message.tool_calls) == 1
+
+    second_message = response.response_messages[1]
+    assert isinstance(second_message, ToolMessage)
+
+    third_message = response.response_messages[2]
+    assert isinstance(third_message, AIMessage)
+    assert third_message.content == "Response after tool call"

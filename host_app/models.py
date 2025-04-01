@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from typing import Any, Sequence
 
 import reflex as rx
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import BaseMessage
 from pydantic import BaseModel
 
 
@@ -13,7 +13,7 @@ class InputState(BaseModel):
 
 
 class OutputState(BaseModel):
-    response_messages: list[AIMessage | ToolMessage]
+    response_messages: Sequence[BaseMessage]
 
 
 class UpdateTypes(StrEnum):

@@ -96,6 +96,7 @@ def connected_mcp_server_infos() -> rx.Component:
                         rx.flex(
                             rx.foreach(server_info.tools, lambda tool: rx.badge(tool.name)),
                             wrap="wrap",
+                            spacing="1",
                         )
                     ),
                 )

@@ -31,7 +31,8 @@ from .models import InputState, OutputState
 
 class FullState(BaseModel):
     question: str
-    response_messages: list[AIMessage | ToolMessage] = []
+    # response_messages: list[ToolMessage | AIMessage] = []
+    response_messages: list[BaseMessage] = []
     conversation_id: str | None = None
 
 
