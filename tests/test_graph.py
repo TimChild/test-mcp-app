@@ -234,57 +234,55 @@ async def test_graph_runs_with_missing_mcp_server(
         assert response.response_messages[0].content == "First response"
 
 
-async def test_graph_with_single_tool_call(
-    graph_runner: GraphRunner, mock_chat_model: FakeChatModel
-):
-    tool_call = ToolCall(id="test-call-id", name="test-tool", args={})
-    mock_chat_model.responses = [
-        AIMessage(content="", tool_calls=[tool_call]),
-        AIMessage("Response after tool call"),
-    ]
-    response: FullState = await graph_runner.ainvoke(input=InputState(question="Hello"))
+class TestWithToolCalls:
+    async def test_single_call(self, graph_runner: GraphRunner, mock_chat_model: FakeChatModel):
+        tool_call = ToolCall(id="test-call-id", name="test-tool", args={})
+        mock_chat_model.responses = [
+            AIMessage(content="", tool_calls=[tool_call]),
+            AIMessage("Response after tool call"),
+        ]
+        response: FullState = await graph_runner.ainvoke(input=InputState(question="Hello"))
 
-    first_message = response.response_messages[0]
-    assert isinstance(first_message, AIMessage)
-    assert first_message.content == ""
-    assert len(first_message.tool_calls) == 1
+        first_message = response.response_messages[0]
+        assert isinstance(first_message, AIMessage)
+        assert first_message.content == ""
+        assert len(first_message.tool_calls) == 1
 
-    second_message = response.response_messages[1]
-    assert isinstance(second_message, ToolMessage)
+        second_message = response.response_messages[1]
+        assert isinstance(second_message, ToolMessage)
 
-    third_message = response.response_messages[2]
-    assert isinstance(third_message, AIMessage)
-    assert third_message.content == "Response after tool call"
+        third_message = response.response_messages[2]
+        assert isinstance(third_message, AIMessage)
+        assert third_message.content == "Response after tool call"
 
+    async def test_sequential_calls(
+        self, graph_runner: GraphRunner, mock_chat_model: FakeChatModel
+    ):
+        tool_call1 = ToolCall(id="test-call-id1", name="test-tool", args={})
+        tool_call2 = ToolCall(id="test-call-id2", name="test-tool", args={})
+        mock_chat_model.responses = [
+            AIMessage(content="", tool_calls=[tool_call1]),
+            AIMessage(content="", tool_calls=[tool_call2]),
+            AIMessage("Response after tool calls"),
+        ]
+        response: FullState = await graph_runner.ainvoke(input=InputState(question="Hello"))
 
-# async def test_graph_with_sequential_tool_calls(
-#     graph_runner: GraphRunner, mock_chat_model: FakeChatModel
-# ):
-#     tool_call1 = ToolCall(id="test-call-id1", name="test-tool", args={})
-#     tool_call2 = ToolCall(id="test-call-id2", name="test-tool", args={})
-#     mock_chat_model.responses = [
-#         AIMessage(content="", tool_calls=[tool_call1]),
-#         AIMessage(content="", tool_calls=[tool_call2]),
-#         AIMessage("Response after tool calls"),
-#     ]
-#     response: FullState = await graph_runner.ainvoke(input=InputState(question="Hello"))
-#
-#     first_message = response.response_messages[0]
-#     assert isinstance(first_message, AIMessage)
-#     assert first_message.content == ""
-#     assert len(first_message.tool_calls) == 1
-#
-#     second_message = response.response_messages[1]
-#     assert isinstance(second_message, ToolMessage)
-#
-#     third_message = response.response_messages[2]
-#     assert isinstance(third_message, AIMessage)
-#     assert third_message.content == ""
-#     assert len(third_message.tool_calls) == 1
-#
-#     fourth_message = response.response_messages[3]
-#     assert isinstance(fourth_message, ToolMessage)
-#
-#     fifth_message = response.response_messages[4]
-#     assert isinstance(fifth_message, AIMessage)
-#     assert fifth_message.content == "Response after tool calls"
+        first_message = response.response_messages[0]
+        assert isinstance(first_message, AIMessage)
+        assert first_message.content == ""
+        assert len(first_message.tool_calls) == 1
+
+        second_message = response.response_messages[1]
+        assert isinstance(second_message, ToolMessage)
+
+        third_message = response.response_messages[2]
+        assert isinstance(third_message, AIMessage)
+        assert third_message.content == ""
+        assert len(third_message.tool_calls) == 1
+
+        fourth_message = response.response_messages[3]
+        assert isinstance(fourth_message, ToolMessage)
+
+        fifth_message = response.response_messages[4]
+        assert isinstance(fifth_message, AIMessage)
+        assert fifth_message.content == "Response after tool calls"

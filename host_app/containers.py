@@ -73,7 +73,7 @@ class Graph(containers.DeclarativeContainer):
 
 
 class Application(containers.DeclarativeContainer):
-    config = providers.Configuration(yaml_files=["config.yml"])
+    config = providers.Configuration(yaml_files=["config.yml"], strict=True)
 
     core = providers.Container(
         Core,
