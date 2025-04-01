@@ -42,7 +42,7 @@ class Adapters(containers.DeclarativeContainer):
 
     some_value = providers.Object("some value")
 
-    mcp_client = providers.Factory(
+    mcp_client: providers.Factory[MultiMCPClient] = providers.Factory(
         MultiMCPClient,
         connections=providers.Factory(
             config_option_to_connections,
@@ -77,7 +77,7 @@ class Application(containers.DeclarativeContainer):
         config=config.core,
     )
 
-    adapters = providers.Container(
+    adapters: providers.Container[Adapters] = providers.Container(
         Adapters,
         config=config.adapters,
     )

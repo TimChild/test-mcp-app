@@ -98,7 +98,6 @@ async def process(
 
         logging.debug("Returning responses")
         # return responses
-    update = OutputState(response_messages=[AIMessage(content=f"Received: {state.question}")])
     if state.conversation_id:
         logging.debug(f"Saving messages for conversation ID: {state.conversation_id}")
         await store.aput(
@@ -106,7 +105,7 @@ async def process(
             key=state.conversation_id,
             value={"messages": messages_to_dict(messages)},
         )
-    return update
+    return OutputState(response_messages=responses)
     # return Command(update=update, goto=["tool_caller_node", "sub_assistant_caller_node"])
 
 

@@ -33,9 +33,6 @@ typeCheckingMode = "standard"
 venvPath = "."
 venv = ".venv"
 
-[tool.uv.sources]
-mcp-client = { path = "../mcp-client" }
-
 [dependency-groups]
 dev = [
     "jupyterlab>=4.3.6",
@@ -60,3 +57,6 @@ filterwarnings = [
     "ignore::DeprecationWarning:pydantic.v1.typing",
 
 ]
+
+[tool.uv.sources]
+mcp-client = { path = "../mcp-client" }

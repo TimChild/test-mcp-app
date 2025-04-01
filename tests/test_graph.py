@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from typing import Any, Callable, Iterator, Literal, Optional, Sequence, Union
 
@@ -9,9 +10,10 @@ from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.graph.graph import CompiledGraph
 from langgraph.store.base import BaseStore, Item
+from mcp_client import MultiMCPClient
 
-from host_app.containers import Application
-from host_app.graph import InputState, OutputState, make_graph
+from host_app.containers import Application, config_option_to_connections
+from host_app.graph import FullState, InputState, OutputState, make_graph
 from host_app.graph_runner import GraphRunner
 from host_app.models import GraphUpdate, UpdateTypes
 
@@ -47,6 +49,10 @@ def fake_chat_model() -> FakeChatModel:
     )
 
 
+class NotSetModel:
+    pass
+
+
 @pytest.fixture(autouse=True, scope="session")
 def container() -> Iterator[Application]:
     container = Application()
@@ -56,14 +62,15 @@ def container() -> Iterator[Application]:
             "example_server": "tests/example_server.py",
         }
     ):
-        container.wire(
-            modules=[
-                "host_app.graph",
-                "host_app.graph_runner",
-            ]
-        )
-        yield container
-        container.unwire()
+        with container.llms.main_model.override(NotSetModel):
+            container.wire(
+                modules=[
+                    "host_app.graph",
+                    "host_app.graph_runner",
+                ]
+            )
+            yield container
+            container.unwire()
 
 
 def test_container(container: Application):
@@ -109,7 +116,7 @@ async def test_invoke_graph(graph: CompiledGraph, basic_runnable_config: Runnabl
     )
 
     validated: OutputState = OutputState.model_validate(result)
-    assert validated.response_messages[0].content == "Received: Hello"
+    assert validated.response_messages[0].content == "First response"
 
 
 def test_init_graph_runner():
@@ -173,3 +180,42 @@ async def test_graph_has_memory(graph_runner: GraphRunner, container: Applicatio
     assert ("messages",) in store.list_namespaces()
     value = store.get(namespace=("messages",), key="test-conv-id")
     assert value is not None
+
+
+async def test_mcp_client_with_missing_server(container: Application):
+    with container.config.adapters.mcp_servers.override(
+        {
+            "example_server": "non_existent.py",
+            "another_server": "https://missing-server.com",
+        }
+    ):
+        # mcp_client = container.adapters.mcp_client()
+        conns = config_option_to_connections(container.config.adapters.mcp_servers())
+        mcp_client = MultiMCPClient(connections=conns)
+        mcp_client.set_connection_timeout(0.5)
+
+        async def func() -> None:
+            async with mcp_client:
+                pass
+
+        try:
+            await asyncio.wait_for(func(), timeout=1)
+        except TimeoutError:
+            pytest.fail("Should not hang on missing server")
+
+
+@pytest.mark.usefixtures("mock_chat_model")
+async def test_graph_runs_with_missing_mcp_server(
+    graph_runner: GraphRunner, container: Application
+):
+    """Should still be able to run the graph even if one of the servers is down."""
+    with container.config.adapters.mcp_servers.override(
+        {
+            "example_server": "non_existent.py",
+            "another_server": "https://missing-server.com",
+        }
+    ):
+        mcp_client = container.adapters.mcp_client()
+        mcp_client.set_connection_timeout(0.5)
+        response: FullState = await graph_runner.ainvoke(input=InputState(question="Hello"))
+        assert response.response_messages[0].content == "First response"
