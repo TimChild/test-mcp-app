@@ -95,7 +95,7 @@ def action_bar() -> rx.Component:
                     ),
                     is_disabled=State.processing,
                 ),
-                on_submit=State.process_question,
+                on_submit=State.handle_send_click,
                 reset_on_submit=True,
             ),
             rx.text(

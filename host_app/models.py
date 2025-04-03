@@ -13,11 +13,15 @@ from pydantic import BaseModel
 
 
 class InputState(BaseModel):
+    """State required to run the graph."""
+
     question: str
     conversation_id: str | None = None
 
 
 class FullGraphState(BaseModel):
+    """Full state used by and returned by graph."""
+
     question: str
     previous_messages: list[BaseMessage] = []
     response_messages: Annotated[list[AnyMessage], add_messages]
@@ -26,6 +30,8 @@ class FullGraphState(BaseModel):
 
 
 class UpdateTypes(StrEnum):
+    """THe types of update that are sent back for the frontend to display."""
+
     start = "start"
     preprocess = "preprocess"
     graph_start = "graph-start"
@@ -39,6 +45,8 @@ class UpdateTypes(StrEnum):
 
 @dataclass
 class GraphUpdate:
+    """Contents of each update."""
+
     type_: UpdateTypes
     delta: str = ""
     name: str = ""
@@ -53,6 +61,8 @@ class QA(rx.Base):
 
 
 class ToolInfo(rx.Base):
+    """Info for each MCP tool."""
+
     name: str
     description: str
 

@@ -9,20 +9,14 @@ from dependency_injector.wiring import Provide, inject
 from dotenv import load_dotenv
 from langchain_core.tools import BaseTool
 from mcp_client import MultiMCPClient
-from openai import OpenAI
 from reflex.event import EventType
 
 from host_app.containers import Application
 
-from .models import QA, GraphUpdate, UpdateTypes
+from .models import QA, GraphUpdate, McpServerInfo, ToolInfo, UpdateTypes
 from .process import get_response_updates
 
 load_dotenv()
-
-SYSTEM_PROMPT = """
-You are a chatbot operating in a developer debugging environment. You can give detailed information about any information you have access to (you do not have to worry about hiding implementation details from a user).
-Respond in markdown.
-"""
 
 # Checking if the API key is set properly
 if not os.getenv("OPENAI_API_KEY"):
@@ -34,46 +28,34 @@ DEFAULT_CHATS = {
 }
 
 
-class ToolInfo(rx.Base):
-    name: str
-    description: str
-
-
-class McpServerInfo(rx.Base):
-    """Information about an MCP server."""
-
-    name: str
-    tools: list[ToolInfo]
-
-
 class State(rx.State):
     """The app state."""
 
     test_var: int = 0
 
-    # A dict from the chat name to the list of questions and answers.
     chats: dict[str, list[QA]] = DEFAULT_CHATS
+    """A dict from the chat name to the list of questions and answers."""
 
-    # The current chat name.
     current_chat = "Intros"
+    """The current chat name."""
 
-    # The current question.
     question: str
+    """The current question."""
 
-    # Whether we are processing the question.
     processing: bool = False
+    """Whether we are processing the question."""
 
-    # The current status.
     current_status: str = ""
+    """The current status."""
 
-    # The name of the new chat.
     new_chat_name: str = ""
+    """The name of the new chat."""
 
-    # New chat modal open state.
     modal_open: bool = False
+    """The new chat modal open state."""
 
-    # Connected MCP servers
     mcp_servers: list[McpServerInfo] = []
+    """The connected MCP servers."""
 
     @rx.event
     def set_new_chat_name(self, name: str) -> None:
@@ -143,7 +125,7 @@ class State(rx.State):
             await asyncio.sleep(0.5)
 
     @rx.event
-    async def process_question(self, form_data: dict[str, Any]) -> AsyncIterator[EventType | None]:
+    async def handle_send_click(self, form_data: dict[str, Any]) -> AsyncIterator[EventType | None]:
         # Get the question from the form
         question = form_data["question"]
 
@@ -151,19 +133,8 @@ class State(rx.State):
         if question == "":
             return
 
-        # # The reflex default
-        # question_processor = self.openai_process_question
-
-        # My implementation
-        question_processor = self.general_process_question
-
-        async for event in question_processor(question):
-            yield event
-
-    async def general_process_question(self, question: str) -> AsyncIterator[EventType | None]:
         qa = QA(question=question, answer="")
         self.chats[self.current_chat].append(qa)
-
         self.processing = True
         yield
 
@@ -206,59 +177,4 @@ class State(rx.State):
             yield
 
         self.current_status = ""
-        self.processing = False
-
-    async def openai_process_question(self, question: str) -> AsyncIterator[None]:
-        """Get the response from the API.
-
-        Args:
-            form_data: A dict with the current question.
-        """
-        # NOTE: This is the Reflex default implementation
-
-        # Add the question to the list of questions.
-        qa = QA(question=question, answer="")
-        self.chats[self.current_chat].append(qa)
-
-        # Clear the input and start the processing.
-        self.processing = True
-        yield
-
-        # Build the messages.
-        messages = [
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT,
-            }
-        ]
-        for qa in self.chats[self.current_chat]:
-            messages.append({"role": "user", "content": qa.question})
-            messages.append({"role": "assistant", "content": qa.answer})
-
-        # Remove the last mock answer.
-        messages = messages[:-1]
-
-        # Start a new session to answer the question.
-        session = OpenAI().chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
-            messages=messages,  # type: ignore
-            stream=True,
-        )  # type: ignore
-
-        # Stream the results, yielding after every word.
-        for item in session:
-            if hasattr(item.choices[0].delta, "content"):
-                answer_text = item.choices[0].delta.content
-                # Ensure answer_text is not None before concatenation
-                if answer_text is not None:
-                    self.chats[self.current_chat][-1].answer += answer_text
-                else:
-                    # Handle the case where answer_text is None, perhaps log it or assign a default value
-                    # For example, assigning an empty string if answer_text is None
-                    answer_text = ""
-                    self.chats[self.current_chat][-1].answer += answer_text
-                self.chats = self.chats
-                yield
-
-        # Toggle the processing flag.
         self.processing = False
