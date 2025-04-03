@@ -59,4 +59,4 @@ filterwarnings = [
 ]
 
 [tool.uv.sources]
-mcp-client = { path = "../mcp-client" }
+mcp-client = { path = "../mcp-client" , editable = true }

@@ -569,7 +569,7 @@ requires-dist = [
     { name = "langchain-mcp-adapters", specifier = ">=0.0.3" },
     { name = "langchain-openai", specifier = ">=0.3.11" },
     { name = "langgraph", specifier = ">=0.3.21" },
-    { name = "mcp-client", directory = "../mcp-client" },
+    { name = "mcp-client", editable = "../mcp-client" },
     { name = "openai", specifier = ">=1.14.0" },
     { name = "reflex", specifier = ">=0.7.0" },
     { name = "reflex-chakra", specifier = ">=0.7.0" },
@@ -1277,7 +1277,7 @@ wheels = [
 [[package]]
 name = "mcp-client"
 version = "0.1.0"
-source = { directory = "../mcp-client" }
+source = { editable = "../mcp-client" }
 dependencies = [
     { name = "anthropic" },
     { name = "langchain-mcp-adapters" },
