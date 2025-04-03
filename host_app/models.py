@@ -1,13 +1,27 @@
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any
 
 import reflex as rx
+from langchain_core.messages import (
+    AnyMessage,
+    BaseMessage,
+)
+from langchain_core.tools import BaseTool
+from langgraph.graph import add_messages
 from pydantic import BaseModel
 
 
 class InputState(BaseModel):
     question: str
+    conversation_id: str | None = None
+
+
+class FullGraphState(BaseModel):
+    question: str
+    previous_messages: list[BaseMessage] = []
+    response_messages: Annotated[list[AnyMessage], add_messages]
+    tools: list[BaseTool] = []
     conversation_id: str | None = None
 
 

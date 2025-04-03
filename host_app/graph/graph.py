@@ -1,13 +1,12 @@
 """Regular graph version of langgraph."""
 
 import logging
-from typing import Annotated, Any, Literal, Sequence
+from typing import Any, Literal, Sequence
 
 from dependency_injector.wiring import Provide, inject
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
-    AnyMessage,
     BaseMessage,
     HumanMessage,
     SystemMessage,
@@ -18,7 +17,7 @@ from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.constants import END
-from langgraph.graph import StateGraph, add_messages
+from langgraph.graph import StateGraph
 from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import ToolNode
 from langgraph.store.base import BaseStore
@@ -28,16 +27,7 @@ from mcp_client import MultiMCPClient
 from pydantic import BaseModel
 
 from host_app.containers import Application
-
-from .models import InputState
-
-
-class FullState(BaseModel):
-    question: str
-    previous_messages: list[BaseMessage] = []
-    response_messages: Annotated[list[AnyMessage], add_messages]
-    tools: list[BaseTool] = []
-    conversation_id: str | None = None
+from host_app.models import FullGraphState, InputState
 
 
 class InitializeOutput(BaseModel):
@@ -72,7 +62,7 @@ class CallLLMOutput(BaseModel):
 
 @inject
 async def call_llm(
-    state: FullState,
+    state: FullGraphState,
     store: BaseStore,
     mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client],
     chat_model: BaseChatModel = Provide[Application.llms.main_model],
@@ -144,7 +134,7 @@ def make_graph(
     checkpointer = checkpointer or MemorySaver()
     store = store or InMemoryStore()
 
-    graph = StateGraph(state_schema=FullState)
+    graph = StateGraph(state_schema=FullGraphState)
     graph.add_node("initialize", initialize)
     graph.add_node("call_llm", call_llm)
     graph.add_node("tool_node", call_tool)

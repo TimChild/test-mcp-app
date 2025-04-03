@@ -27,8 +27,7 @@ from mcp_client import MultiMCPClient
 from pydantic import BaseModel
 
 from host_app.containers import Application
-
-from .models import InputState
+from host_app.models import InputState
 
 checkpointer = MemorySaver()
 

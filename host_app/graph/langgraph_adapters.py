@@ -17,9 +17,9 @@ from mcp_client import MultiMCPClient
 from pydantic import BaseModel
 
 from host_app.containers import Application
+from host_app.models import FullGraphState, GraphUpdate, UpdateTypes
 
-from .graph import FullState, make_graph
-from .models import GraphUpdate, UpdateTypes
+from .graph import make_graph
 
 
 class GraphAdapter:
@@ -46,9 +46,9 @@ class GraphAdapter:
             configurable={"thread_id": thread_id or str(uuid.uuid4())},
         )
 
-    async def ainvoke(self, input: BaseModel, thread_id: str | None = None) -> FullState:
+    async def ainvoke(self, input: BaseModel, thread_id: str | None = None) -> FullGraphState:
         result = await self.graph.ainvoke(input=input, config=self._make_runnable_config(thread_id))
-        return FullState.model_validate(result)
+        return FullGraphState.model_validate(result)
 
     async def astream_events(
         self, input: BaseModel, thread_id: str | None = None

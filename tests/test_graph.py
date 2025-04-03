@@ -13,9 +13,8 @@ from langgraph.store.base import BaseStore, Item
 from mcp_client import MultiMCPClient
 
 from host_app.containers import Application, config_option_to_connections
-from host_app.graph import FullState, make_graph
-from host_app.langgraph_adapters import GraphAdapter
-from host_app.models import GraphUpdate, InputState, UpdateTypes
+from host_app.graph import GraphAdapter, make_graph
+from host_app.models import FullGraphState, GraphUpdate, InputState, UpdateTypes
 
 EXAMPLE_SERVER_CONFIG = {
     "command": "uv",
@@ -73,8 +72,8 @@ def container() -> Iterator[Application]:
         with container.llms.main_model.override(NotSetModel):
             container.wire(
                 modules=[
-                    "host_app.graph",
-                    "host_app.langgraph_adapters",
+                    "host_app.graph.graph",
+                    "host_app.graph.langgraph_adapters",
                 ]
             )
             yield container
@@ -126,7 +125,7 @@ async def test_invoke_graph(graph: CompiledGraph, basic_runnable_config: Runnabl
         input=InputState(question="Hello"), config=basic_runnable_config
     )
 
-    validated: FullState = FullState.model_validate(result)
+    validated: FullGraphState = FullGraphState.model_validate(result)
     assert validated.response_messages[0].content == "First response"
 
 
@@ -230,7 +229,7 @@ async def test_graph_runs_with_missing_mcp_server(
     ):
         mcp_client = container.adapters.mcp_client()
         mcp_client.set_connection_timeout(0.5)
-        response: FullState = await graph_adapter.ainvoke(input=InputState(question="Hello"))
+        response: FullGraphState = await graph_adapter.ainvoke(input=InputState(question="Hello"))
         assert response.response_messages[0].content == "First response"
 
 
@@ -241,7 +240,7 @@ class TestWithToolCalls:
             AIMessage(content="", tool_calls=[tool_call]),
             AIMessage("Response after tool call"),
         ]
-        response: FullState = await graph_adapter.ainvoke(input=InputState(question="Hello"))
+        response: FullGraphState = await graph_adapter.ainvoke(input=InputState(question="Hello"))
 
         first_message = response.response_messages[0]
         assert isinstance(first_message, AIMessage)
@@ -265,7 +264,7 @@ class TestWithToolCalls:
             AIMessage(content="", tool_calls=[tool_call2]),
             AIMessage("Response after tool calls"),
         ]
-        response: FullState = await graph_adapter.ainvoke(input=InputState(question="Hello"))
+        response: FullGraphState = await graph_adapter.ainvoke(input=InputState(question="Hello"))
 
         first_message = response.response_messages[0]
         assert isinstance(first_message, AIMessage)
