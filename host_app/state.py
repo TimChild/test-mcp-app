@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 import time
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Mapping, Sequence
 
 import reflex as rx
 from dependency_injector.wiring import Provide, inject
@@ -119,7 +119,7 @@ class State(rx.State):
         self, mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client]
     ) -> None:
         """Load the state."""
-        server_tools: dict[str, list[BaseTool]] = await mcp_client.get_tools_by_server()
+        server_tools: Mapping[str, Sequence[BaseTool]] = await mcp_client.get_tools_by_server()
         self.mcp_servers = []
         for server_name, tools in server_tools.items():
             tool_infos = [ToolInfo(name=tool.name, description=tool.description) for tool in tools]

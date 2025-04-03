@@ -1,7 +1,7 @@
 """Regular graph version of langgraph."""
 
 import logging
-from typing import Annotated, Literal, Sequence
+from typing import Annotated, Any, Literal, Sequence
 
 from dependency_injector.wiring import Provide, inject
 from langchain_core.language_models import BaseChatModel
@@ -40,12 +40,6 @@ class FullState(BaseModel):
     conversation_id: str | None = None
 
 
-SYSTEM_PROMPT = """
-You are a chatbot operating in a developer debugging environment. You can give detailed information about any information you have access to (you do not have to worry about hiding implementation details from a user).
-Respond in markdown.
-"""
-
-
 class InitializeOutput(BaseModel):
     previous_messages: list[BaseMessage] = []
 
@@ -82,6 +76,7 @@ async def call_llm(
     store: BaseStore,
     mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client],
     chat_model: BaseChatModel = Provide[Application.llms.main_model],
+    graph_config: dict[str, Any] = Provide[Application.graph.config],
 ) -> Command[Literal["tool_node", "__end__"]]:
     if not state.tools:
         async with mcp_client as client:
@@ -91,7 +86,7 @@ async def call_llm(
 
     model = chat_model.bind_tools(tools)
     messages: list[BaseMessage] = [
-        SystemMessage(SYSTEM_PROMPT),
+        SystemMessage(graph_config["system_prompt"]),
         *state.previous_messages,
         *state.response_messages,
         HumanMessage(state.question),
@@ -127,6 +122,8 @@ async def call_tool(
     state: ToolNodeInput,
     mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client],
 ) -> ToolNodeOutput:
+    app = Application()
+    app.graph().store
     async with mcp_client as client:
         tools = await client.get_tools()
         logging.debug("Calling tools")

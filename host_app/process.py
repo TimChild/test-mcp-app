@@ -3,7 +3,7 @@ import uuid
 from typing import AsyncIterator
 
 from .functional_langgraph import InputState
-from .graph_runner import GraphRunner
+from .langgraph_adapters import GraphAdapter
 from .models import QA, GraphUpdate, UpdateTypes
 
 
@@ -19,7 +19,7 @@ async def get_response_updates(
         type_=UpdateTypes.preprocess, data=f"Length History: {len(message_history)}\n\n"
     )
     logging.debug(f"calling with Conversation ID: {conversation_id}")
-    async for update in GraphRunner().astream_events(
+    async for update in GraphAdapter().astream_events(
         input=InputState(question=question, conversation_id=conversation_id),
         thread_id=thread_id,
     ):

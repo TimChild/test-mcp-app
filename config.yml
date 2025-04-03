@@ -16,6 +16,11 @@ core:
       level: "DEBUG"
       handlers: ["console"]
 
+graph:
+  system_prompt: |
+    You are a chatbot operating in a developer debugging environment. You can give detailed information about any information you have access to (you do not have to worry about hiding implementation details from a user).
+    Respond in markdown.
+
 adapters:
   # Servers as either urls or paths to python modules (not javascript for now)
   mcp_servers:

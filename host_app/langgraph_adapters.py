@@ -22,7 +22,17 @@ from .graph import FullState, make_graph
 from .models import GraphUpdate, UpdateTypes
 
 
-class GraphRunner:
+class GraphAdapter:
+    """Adapter between langgraph graph and rest of app.
+
+    Use this to call langgraph graphs and convert events/values to a representation
+    used by the rest of the app (e.g. rx.Base models).
+
+    This is primarily to protect against the rapidly changing langchain ecosystem.
+    Avoid relying on langgraph/langchain throughout app so that this is a centralized
+    location to update code on breaking changes.
+    """
+
     def __init__(
         self,
         graph: CompiledGraph | None = None,
