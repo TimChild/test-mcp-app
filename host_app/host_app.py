@@ -1,4 +1,4 @@
-"""The main Chat app."""
+"""Initialize the Reflex app and dependecy injector container."""
 
 import logging
 
@@ -30,13 +30,7 @@ def index() -> rx.Component:
 
 def make_app() -> rx.App:
     container = Application()
-    container.core.init_resources()
-    container.wire(
-        modules=[
-            ".graph",
-            ".state",
-        ]
-    )
+    container.init_resources()
 
     # Add state and page to the app.
     app = rx.App(

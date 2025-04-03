@@ -9,19 +9,20 @@ from mcp_client import MultiMCPClient
 from mcp_client.multi_client import SSEConnection, StdioConnection
 
 
-class Core(containers.DeclarativeContainer):
-    config = providers.Configuration()
-
-    logging = providers.Resource(
-        logging.config.dictConfig,
-        config=config.logging,
-    )
-
-
 def config_option_to_connections(
     simple_config_dict: dict[str, dict[str, Any]],
 ) -> dict[str, StdioConnection | SSEConnection]:
-    """Add the necessary fields for a full MCP connection based on uri."""
+    """Convert the mcp config dict from yaml to Connections.
+
+    Basically just determine which type of connection, then check that the args are specified
+    correctly for that connection type.
+
+    Args:
+        - The full mcp connections config as loaded from config.yaml
+
+    Returns:
+        - Sanitized connections dict utilizing the StdioConnection and SSEConnection TypedDict classes.
+    """
     connections: dict[str, StdioConnection | SSEConnection] = {}
     assert isinstance(simple_config_dict, dict)
     for name, conf in simple_config_dict.items():
@@ -44,53 +45,32 @@ def config_option_to_connections(
     return connections
 
 
-class Adapters(containers.DeclarativeContainer):
-    config = providers.Configuration()
+class Application(containers.DeclarativeContainer):
+    config = providers.Configuration(yaml_files=["config.yml"], strict=True)
 
-    mcp_client: providers.Factory[MultiMCPClient] = providers.Factory(
+    logging = providers.Resource(
+        logging.config.dictConfig,
+        config=config.logging,
+    )
+
+    mcp_client = providers.Factory(
         MultiMCPClient,
-        connections=providers.Factory(
+        connections=providers.Singleton(
             config_option_to_connections,
             config.mcp_servers,
         ),
     )
-
-
-class LLMs(containers.DeclarativeContainer):
-    config = providers.Configuration()
-
     main_model = providers.Factory(
         ChatOpenAI,
         model="gpt-4o",
     )
-
-
-class Graph(containers.DeclarativeContainer):
-    config = providers.Configuration()
-
     checkpointer = providers.Singleton(MemorySaver)
     store = providers.Singleton(InMemoryStore)
 
-
-class Application(containers.DeclarativeContainer):
-    config = providers.Configuration(yaml_files=["config.yml"], strict=True)
-
-    core = providers.Container(
-        Core,
-        config=config.core,
-    )
-
-    adapters: providers.Container[Adapters] = providers.Container(
-        Adapters,
-        config=config.adapters,
-    )
-
-    llms = providers.Container(
-        LLMs,
-        config=config.llms,
-    )
-
-    graph = providers.Container(
-        Graph,
-        config=config.graph,
+    wiring_config = containers.WiringConfiguration(
+        modules=[
+            ".host_app",
+            ".state",
+        ],
+        packages=[".graph"],
     )

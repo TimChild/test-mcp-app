@@ -1,45 +1,42 @@
 debug_mode: true
 
-core:
-  logging:
-    version: 1
-    formatters:
-      formatter:
-        format: "[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s"
-    handlers:
-      console:
-        class: "logging.StreamHandler"
-        level: "DEBUG"
-        formatter: "formatter"
-        stream: "ext://sys.stderr"
-    root:
+logging:
+  version: 1
+  formatters:
+    formatter:
+      format: "[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s"
+  handlers:
+    console:
+      class: "logging.StreamHandler"
       level: "DEBUG"
-      handlers: ["console"]
+      formatter: "formatter"
+      stream: "ext://sys.stderr"
+  root:
+    level: "DEBUG"
+    handlers: ["console"]
 
-graph:
-  system_prompt: |
-    You are a chatbot operating in a developer debugging environment. You can give detailed information about any information you have access to (you do not have to worry about hiding implementation details from a user).
-    Respond in markdown.
+system_prompt: |
+  You are a chatbot operating in a developer debugging environment. You can give detailed information about any information you have access to (you do not have to worry about hiding implementation details from a user).
+  Respond in markdown.
 
-adapters:
-  # Servers as either urls or paths to python modules (not javascript for now)
-  mcp_servers:
-    example_server:
-      url: "http://localhost:9090/sse"
-    git:
-      command: uv
-      args:
-        [
-          "--directory",
-          "../../mcp-servers/official-servers/src/git",
-          "run",
-          "mcp-server-git",
-        ]
-    github:
-      command: npx
-      args: ["-y", "@modelcontextprotocol/server-github"]
-      env:
-        GITHUB_PERSONAL_ACCESS_TOKEN: $GITHUB_PERSONAL_ACCESS_TOKEN
-    filesystem:
-      command: npx
-      args: ["-y", "@modelcontextprotocol/server-filesystem", "~/mcp_allowed/"]
+# Servers as either urls or paths to python modules (not javascript for now)
+mcp_servers:
+  example_server:
+    url: "http://localhost:9090/sse"
+  git:
+    command: uv
+    args:
+      [
+        "--directory",
+        "../../mcp-servers/official-servers/src/git",
+        "run",
+        "mcp-server-git",
+      ]
+  github:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: $GITHUB_PERSONAL_ACCESS_TOKEN
+  filesystem:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "~/mcp_allowed/"]

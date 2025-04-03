@@ -8,8 +8,10 @@ from langchain_core.language_models.fake_chat_models import FakeMessagesListChat
 from langchain_core.messages import AIMessage, BaseMessage, ToolCall, ToolMessage
 from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.graph import CompiledGraph
 from langgraph.store.base import BaseStore, Item
+from langgraph.store.memory import InMemoryStore
 from mcp_client import MultiMCPClient
 
 from host_app.containers import Application, config_option_to_connections
@@ -68,37 +70,35 @@ class NotSetModel:
 def container() -> Iterator[Application]:
     container = Application()
     container.config.from_yaml("config.yml")
-    with container.config.adapters.mcp_servers.override({"example_server": EXAMPLE_SERVER_CONFIG}):
-        with container.llms.main_model.override(NotSetModel):
-            container.wire(
-                modules=[
-                    "host_app.graph.graph",
-                    "host_app.graph.langgraph_adapters",
-                ]
-            )
-            yield container
-            container.unwire()
+    with container.config.mcp_servers.override({"example_server": EXAMPLE_SERVER_CONFIG}):
+        with container.main_model.override(NotSetModel()):
+            with container.store.override(InMemoryStore()):
+                with container.checkpointer.override(MemorySaver()):
+                    yield container
 
 
-def test_container(container: Application):
+def test_containers(container: Application):
     """Check the container is set up correctly."""
-    conf = container.config.adapters.mcp_servers()["example_server"]
+    conf = container.config.mcp_servers()["example_server"]
     assert isinstance(conf, dict)
     assert conf["command"] == "uv"
     assert conf["args"] == ["run", "tests/example_server.py"]
-    connections = container.adapters.mcp_client().connections
+    connections = container.mcp_client().connections
     assert "example_server" in connections
     # NOTE: connections is a dict[name, SSEConnection | StdioConnection]
     assert "tests/example_server.py" in str(connections["example_server"]), (
         "Should include the path somewhere"
     )
 
+    assert isinstance(container.store(), InMemoryStore)
+    assert isinstance(container.checkpointer(), MemorySaver)
+
 
 @pytest.fixture
 def mock_chat_model(
     container: Application, fake_chat_model: FakeChatModel
 ) -> Iterator[FakeChatModel]:
-    with container.llms.main_model.override(fake_chat_model):
+    with container.main_model.override(fake_chat_model):
         yield fake_chat_model
 
 
@@ -155,7 +155,7 @@ async def test_astream_graph_adapter(graph_adapter: GraphAdapter):
 
 
 async def test_memory_store_standalone(container: Application):
-    store = container.graph.store()
+    store = container.store()
     before = await store.aget(namespace=("testing",), key="test")
     assert ("testing",) in store.list_namespaces(), "Should have been created on attempted access"
     assert before is None
@@ -167,7 +167,7 @@ async def test_memory_store_standalone(container: Application):
     assert after.value == {"value": "value"}
 
     # Check that `store` is a singleton
-    store2 = container.graph.store()
+    store2 = container.store()
     after2 = await store2.aget(namespace=("testing",), key="test")
     assert isinstance(after2, Item)
     assert after2.value == {"value": "value"}
@@ -188,21 +188,21 @@ async def test_graph_has_memory(graph_adapter: GraphAdapter, container: Applicat
         input=InputState(question="Hello", conversation_id="test-conv-id"),
     )
 
-    store: BaseStore = container.graph.store()
+    store: BaseStore = container.store()
     assert ("messages",) in store.list_namespaces()
     value = store.get(namespace=("messages",), key="test-conv-id")
     assert value is not None
 
 
 async def test_mcp_client_with_missing_server(container: Application):
-    with container.config.adapters.mcp_servers.override(
+    with container.config.mcp_servers.override(
         {
             "example_server": EXAMPLE_SERVER_CONFIG,
             "missing_server": MISSING_STDIO_SERVER_CONFIG,
         }
     ):
         # mcp_client = container.adapters.mcp_client()
-        conns = config_option_to_connections(container.config.adapters.mcp_servers())
+        conns = config_option_to_connections(container.config.mcp_servers())
         mcp_client = MultiMCPClient(connections=conns)
         mcp_client.set_connection_timeout(0.5)
 
@@ -221,13 +221,13 @@ async def test_graph_runs_with_missing_mcp_server(
     graph_adapter: GraphAdapter, container: Application
 ):
     """Should still be able to run the graph even if one of the servers is down."""
-    with container.config.adapters.mcp_servers.override(
+    with container.config.mcp_servers.override(
         {
             "example_server": EXAMPLE_SERVER_CONFIG,
             "missing_server": MISSING_SSE_SERVER_CONFIG,
         }
     ):
-        mcp_client = container.adapters.mcp_client()
+        mcp_client = container.mcp_client()
         mcp_client.set_connection_timeout(0.5)
         response: FullGraphState = await graph_adapter.ainvoke(input=InputState(question="Hello"))
         assert response.response_messages[0].content == "First response"

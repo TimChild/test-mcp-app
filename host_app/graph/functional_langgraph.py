@@ -39,7 +39,7 @@ Respond in markdown.
 
 @asynccontextmanager
 async def connect_client(
-    mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client],
+    mcp_client: MultiMCPClient = Provide[Application.mcp_client],
 ) -> AsyncIterator[MultiMCPClient]:
     async with mcp_client:
         yield mcp_client

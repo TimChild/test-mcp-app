@@ -36,7 +36,7 @@ class GraphAdapter:
     def __init__(
         self,
         graph: CompiledGraph | None = None,
-        mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client],
+        mcp_client: MultiMCPClient = Provide[Application.mcp_client],
     ) -> None:
         self.graph = graph or make_graph()
         self.mcp_client = mcp_client

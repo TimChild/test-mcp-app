@@ -97,9 +97,7 @@ class State(rx.State):
 
     @rx.event
     @inject
-    async def on_load(
-        self, mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client]
-    ) -> None:
+    async def on_load(self, mcp_client: MultiMCPClient = Provide[Application.mcp_client]) -> None:
         """Load the state."""
         server_tools: Mapping[str, Sequence[BaseTool]] = await mcp_client.get_tools_by_server()
         self.mcp_servers = []

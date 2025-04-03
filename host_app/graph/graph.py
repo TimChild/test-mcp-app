@@ -1,7 +1,7 @@
 """Regular graph version of langgraph."""
 
 import logging
-from typing import Any, Literal, Sequence
+from typing import Literal, Sequence
 
 from dependency_injector.wiring import Provide, inject
 from langchain_core.language_models import BaseChatModel
@@ -64,9 +64,9 @@ class CallLLMOutput(BaseModel):
 async def call_llm(
     state: FullGraphState,
     store: BaseStore,
-    mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client],
-    chat_model: BaseChatModel = Provide[Application.llms.main_model],
-    graph_config: dict[str, Any] = Provide[Application.graph.config],
+    mcp_client: MultiMCPClient = Provide[Application.mcp_client],
+    chat_model: BaseChatModel = Provide[Application.main_model],
+    system_prompt: str = Provide[Application.config.system_prompt],
 ) -> Command[Literal["tool_node", "__end__"]]:
     if not state.tools:
         async with mcp_client as client:
@@ -76,7 +76,7 @@ async def call_llm(
 
     model = chat_model.bind_tools(tools)
     messages: list[BaseMessage] = [
-        SystemMessage(graph_config["system_prompt"]),
+        SystemMessage(system_prompt),
         *state.previous_messages,
         *state.response_messages,
         HumanMessage(state.question),
@@ -110,10 +110,8 @@ class ToolNodeOutput(BaseModel):
 @inject
 async def call_tool(
     state: ToolNodeInput,
-    mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client],
+    mcp_client: MultiMCPClient = Provide[Application.mcp_client],
 ) -> ToolNodeOutput:
-    app = Application()
-    app.graph().store
     async with mcp_client as client:
         tools = await client.get_tools()
         logging.debug("Calling tools")
@@ -127,8 +125,8 @@ async def call_tool(
 
 @inject
 def make_graph(
-    checkpointer: BaseCheckpointSaver | None = Provide[Application.graph.checkpointer],
-    store: BaseStore | None = Provide[Application.graph.store],
+    checkpointer: BaseCheckpointSaver | None = Provide[Application.checkpointer],
+    store: BaseStore | None = Provide[Application.store],
     debug_mode: bool = Provide[Application.config.debug_mode],
 ) -> CompiledGraph:
     checkpointer = checkpointer or MemorySaver()
