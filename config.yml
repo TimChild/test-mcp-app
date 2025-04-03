@@ -38,14 +38,3 @@ adapters:
     filesystem:
       command: npx
       args: ["-y", "@modelcontextprotocol/server-filesystem", "~/mcp_allowed/"]
-
-  database:
-    dsn: ":memory:"
-
-  aws:
-    access_key_id: "KEY"
-    secret_access_key: "SECRET"
-
-services:
-  auth:
-    token_ttl: 3600
