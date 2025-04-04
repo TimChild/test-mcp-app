@@ -25,3 +25,7 @@ tasks:
   watch-ruff:
     cmds:
       - find . -type f -name "*.py" -not -path "*/.venv/*" | entr uv run ruff check --fix
+
+  jupyter:
+    cmds:
+      - uv run --with jupyterlab jupyter lab
