@@ -28,4 +28,4 @@ tasks:
 
   jupyter:
     cmds:
-      - uv run --with jupyterlab jupyter lab
+      - uv run --with jupyterlab --with jupyterlab-vim jupyter lab

@@ -1,4 +1,5 @@
 debug_mode: true
+use_functional_graph: false
 
 logging:
   version: 1
@@ -8,11 +9,11 @@ logging:
   handlers:
     console:
       class: "logging.StreamHandler"
-      level: "DEBUG"
+      level: "INFO"
       formatter: "formatter"
       stream: "ext://sys.stderr"
   root:
-    level: "DEBUG"
+    level: "INFO"
     handlers: ["console"]
 
 system_prompt: |
