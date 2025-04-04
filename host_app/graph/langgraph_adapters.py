@@ -30,6 +30,7 @@ from host_app.models import (
     UpdateTypes,
 )
 
+from .functional_langgraph import make_graph as make_functional_graph
 from .graph import make_graph
 
 
@@ -50,6 +51,10 @@ class EventsToUpdatesHandlerProtocol(Protocol):
         raise NotImplementedError("handle_stream_event not implemented")
 
 
+class FunctionalAdapter:
+    pass
+
+
 class GraphAdapter:
     """Adapter between langgraph graph and rest of app.
 
@@ -65,8 +70,16 @@ class GraphAdapter:
         self,
         graph: CompiledGraph | None = None,
         mcp_client: MultiMCPClient = Provide[Application.mcp_client],
+        use_functional_graph: bool = Provide[Application.config.use_functional_graph],
     ) -> None:
-        self.graph = graph or make_graph()
+        if graph is not None:
+            self.graph = graph
+        else:
+            if use_functional_graph:
+                self.graph = make_functional_graph()
+            else:
+                self.graph = make_graph()
+
         self.mcp_client = mcp_client
 
     def _make_runnable_config(self, thread_id: str | None = None) -> RunnableConfig:
@@ -98,7 +111,7 @@ class GraphAdapter:
             [possible loop back to tool calls]
             - GeneralUpdate: Graph End
         """
-        # yield GeneralUpdate(type_=UpdateTypes.graph_start, data=thread_id)
+        yield GeneralUpdate(type_=UpdateTypes.graph_start, data=thread_id)
 
         stream_handler = events_to_updates_handler or StreamHandler()
 
@@ -110,12 +123,10 @@ class GraphAdapter:
             assert isinstance(event, tuple)
             assert len(event) == 2
             event = LgEvent(mode=event[0], data=event[1])
-            # yield event
-            # continue
             for update in stream_handler.handle_stream_event(event):
                 yield update
 
-        # yield GeneralUpdate(type_=UpdateTypes.graph_end)
+        yield GeneralUpdate(type_=UpdateTypes.graph_end)
 
 
 class StreamHandler(EventsToUpdatesHandlerProtocol):
@@ -145,7 +156,8 @@ def get_update(
             logging.info("Values update")
             # Updates at end of graph nodes
             value_update = event.data
-            assert isinstance(value_update, dict)
+            if not isinstance(value_update, dict):
+                raise GraphUpdateError(f"Expected dict, got {type(value_update)}")
             yield from get_value_update(value_update, current_message_type)
         case "messages":
             logging.info("Messages update")

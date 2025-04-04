@@ -1,15 +1,11 @@
-"""Using the new Functional API for langgraph.
-
-2025-03-30 -- Unfortunately, it has a bug that prevents it from working in `.astream_events` mode.
-@task's return None instead of their values.
-"""
+"""Using the new Functional API for langgraph."""
 
 import asyncio
 import logging
-from contextlib import asynccontextmanager
-from typing import AsyncIterator, Sequence
+from typing import Sequence
 
 from dependency_injector.wiring import Provide, inject
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
     AnyMessage,
@@ -18,10 +14,13 @@ from langchain_core.messages import (
     SystemMessage,
     ToolCall,
     ToolMessage,
+    messages_from_dict,
 )
 from langchain_core.tools import BaseTool
-from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.func import entrypoint, task
+from langgraph.pregel import Pregel
+from langgraph.store.base import BaseStore
 from mcp_client import MultiMCPClient
 from pydantic import BaseModel
 
@@ -29,78 +28,114 @@ from host_app.containers import Application
 from host_app.models import InputState
 
 
-@asynccontextmanager
-async def connect_client(
-    mcp_client: MultiMCPClient = Provide[Application.mcp_client],
-) -> AsyncIterator[MultiMCPClient]:
-    async with mcp_client:
-        yield mcp_client
+class InitializeOutput(BaseModel):
+    previous_messages: list[BaseMessage] = []
 
 
 @task
-async def call_tool(tool_call: ToolCall, tools: Sequence[BaseTool]) -> ToolMessage:
-    logging.debug(f"Calling tool: {tool_call}")
-    tool = next(tool for tool in tools if tool.name == tool_call["name"])
-    tool_call_result = await tool.ainvoke(tool_call)
-    assert isinstance(tool_call_result, ToolMessage)
-    return tool_call_result
+async def load_previous_messages(
+    conversation_id: str | None,
+    store: BaseStore,
+) -> list[BaseMessage]:
+    previous_messages: list[BaseMessage] = []
+    if conversation_id:
+        loaded = await store.aget(namespace=("messages",), key=conversation_id)
+        if loaded:
+            previous_messages = messages_from_dict(loaded.value["messages"])
+    return previous_messages
+
+
+class CallToolsInput(BaseModel):
+    response_messages: list[BaseMessage]
+    tools: list[BaseTool]
+
+
+class CallToolsOutput(BaseModel):
+    response_messages: list[BaseMessage]
+
+
+@task
+async def call_tools(tool_calls: list[ToolCall], tools: Sequence[BaseTool]) -> list[ToolMessage]:
+    def missing_message(tool_call: ToolCall) -> ToolMessage:
+        return ToolMessage(
+            tool_call_id=tool_call["id"],
+            content=f"Error: Missing ToolMessage from tool {tool_call['name']}",
+        )
+
+    logging.debug(f"Calling tools: {[tc['name'] for tc in tool_calls]}")
+
+    tools_by_name: dict[str, BaseTool] = {tool.name: tool for tool in tools}
+
+    response_tasks = []
+    async with asyncio.TaskGroup() as tg:
+        for tool_call in tool_calls:
+            if tool_call["name"] not in tools_by_name:
+                response_tasks.append(missing_message(tool_call))
+            tool = tools_by_name[tool_call["name"]]
+            response_tasks.append(tg.create_task(tool.ainvoke(tool_call)))
+
+    tool_responses = await asyncio.gather(*response_tasks)
+    for response in tool_responses:
+        print(type(response))
+    assert all(isinstance(tool_response, ToolMessage) for tool_response in tool_responses)
+    return tool_responses
 
 
 class OutputState(BaseModel):
     response_messages: Sequence[AnyMessage]
 
 
-@entrypoint(checkpointer=Provide[Application.checkpointer])
 @inject
-async def process(
-    inputs: InputState, system_prompt: str = Provide[Application.config.system_prompt]
-) -> OutputState:
-    responses: list[AIMessage | ToolMessage] = []
-    question = inputs.question
-    model = ChatOpenAI(model="gpt-4o")
-    logging.debug(f"Processing question: {question}")
+def make_graph(
+    checkpointer: BaseCheckpointSaver = Provide[Application.checkpointer],
+    store: BaseStore = Provide[Application.store],
+    system_prompt: str = Provide[Application.config.system_prompt],
+    mcp_client: MultiMCPClient = Provide[Application.mcp_client],
+    chat_model: BaseChatModel = Provide[Application.main_model],
+    max_iterations: int = 10,
+) -> Pregel:
+    """Create a graph with the given checkpointer and store."""
 
-    async with connect_client() as client:
-        tools = await client.get_tools()
-        model = model.bind_tools(tools)
+    @entrypoint(checkpointer=checkpointer, store=store)
+    async def graph(
+        inputs: InputState,
+        store: BaseStore,
+    ) -> OutputState:
+        responses: list[AIMessage | ToolMessage] = []
+        question = inputs.question
+        logging.debug(f"Processing question: {question}")
 
-        messages: list[BaseMessage] = [
-            SystemMessage(system_prompt),
-            HumanMessage(question),
-        ]
-        response: BaseMessage = await model.ainvoke(input=messages)
-        assert isinstance(response, AIMessage)
-        responses.append(response)
-        messages.append(response)
-        logging.debug("Got initial response")
+        async with mcp_client as client:
+            tools = await client.get_tools()
 
-        assert isinstance(response, AIMessage)
-        if response.tool_calls:
-            logging.debug("Calling tools")
-            futures = [call_tool(tool_call, tools) for tool_call in response.tool_calls]
-            results = await asyncio.gather(*futures)
-            if any(not isinstance(result, ToolMessage) for result in results):
-                logging.error(f"Got invalid tool response: {results}")
-                results = [
-                    r
-                    if isinstance(r, ToolMessage)
-                    else ToolMessage(
-                        tool_call_id=call["id"], content="Error: Missing ToolMessage from tool"
-                    )
-                    for r, call in zip(results, response.tool_calls, strict=True)
-                ]
-            responses.extend(results)
-            messages.extend(results)
-            logging.debug("Got tool responses")
-            try:
-                response = await model.ainvoke(input=messages)
-            except Exception as e:
-                logging.error(f"Error invoking model: {e}")
-                logging.error(f"Messages: {messages}")
-                raise e
-            assert isinstance(response, AIMessage)
-            responses.append(response)
+            model = chat_model.bind_tools(tools)
 
-        logging.debug("Returning responses")
-        # return responses
+            previous_messages = await load_previous_messages(
+                conversation_id=inputs.conversation_id, store=store
+            )
+
+            messages: list[BaseMessage] = [
+                SystemMessage(system_prompt),
+                *previous_messages,
+                HumanMessage(question),
+            ]
+
+            # Loop calling ai -> tools -> ai ... until no more tool calls or max iterations
+            for i in range(max_iterations):
+                logging.debug(f"Iteration {i}")
+
+                ai_message: BaseMessage = await model.ainvoke(input=messages)
+                assert isinstance(ai_message, AIMessage)
+                messages.append(ai_message)
+
+                if not ai_message.tool_calls:
+                    break
+
+                tool_responses: list[ToolMessage] = await call_tools(
+                    ai_message.tool_calls, tools=tools
+                )
+                messages.extend(tool_responses)
+
         return OutputState(response_messages=responses)
+
+    return graph
