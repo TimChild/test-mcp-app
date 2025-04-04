@@ -9,7 +9,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Sequence
 
-from dependency_injector.wiring import Provide
+from dependency_injector.wiring import Provide, inject
 from langchain_core.messages import (
     AIMessage,
     AnyMessage,
@@ -21,20 +21,12 @@ from langchain_core.messages import (
 )
 from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.func import entrypoint, task
 from mcp_client import MultiMCPClient
 from pydantic import BaseModel
 
 from host_app.containers import Application
 from host_app.models import InputState
-
-checkpointer = MemorySaver()
-
-SYSTEM_PROMPT = """
-You are a chatbot operating in a developer debugging environment. You can give detailed information about any information you have access to (you do not have to worry about hiding implementation details from a user).
-Respond in markdown.
-"""
 
 
 @asynccontextmanager
@@ -58,8 +50,11 @@ class OutputState(BaseModel):
     response_messages: Sequence[AnyMessage]
 
 
-@entrypoint(checkpointer=checkpointer)
-async def process(inputs: InputState) -> OutputState:
+@entrypoint(checkpointer=Provide[Application.checkpointer])
+@inject
+async def process(
+    inputs: InputState, system_prompt: str = Provide[Application.config.system_prompt]
+) -> OutputState:
     responses: list[AIMessage | ToolMessage] = []
     question = inputs.question
     model = ChatOpenAI(model="gpt-4o")
@@ -70,7 +65,7 @@ async def process(inputs: InputState) -> OutputState:
         model = model.bind_tools(tools)
 
         messages: list[BaseMessage] = [
-            SystemMessage(SYSTEM_PROMPT),
+            SystemMessage(system_prompt),
             HumanMessage(question),
         ]
         response: BaseMessage = await model.ainvoke(input=messages)
