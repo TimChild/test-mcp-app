@@ -15,7 +15,20 @@ from reflex.event import EventType
 from host_app.containers import Application
 from host_app.graph.langgraph_adapters import GraphAdapter
 
-from .models import QA, GraphUpdate, InputState, McpServerInfo, ToolInfo, UpdateTypes
+from .models import (
+    QA,
+    AIEndUpdate,
+    AIStartUpdate,
+    AIStreamUpdate,
+    GeneralUpdate,
+    GraphUpdate,
+    InputState,
+    McpServerInfo,
+    ToolEndUpdate,
+    ToolInfo,
+    ToolStartUpdate,
+    UpdateTypes,
+)
 
 load_dotenv()
 
@@ -144,26 +157,40 @@ class State(rx.State):
         ):
             update: GraphUpdate
             match update.type_:
-                case UpdateTypes.ai_delta:
+                case UpdateTypes.graph_start:
+                    assert isinstance(update, GeneralUpdate)
+                    pass
+                case UpdateTypes.ai_message_start:
+                    assert isinstance(update, AIStartUpdate)
+                    pass
+                case UpdateTypes.ai_stream:
                     logging.debug("AI delta update")
+                    assert isinstance(update, AIStreamUpdate)
                     self.chats[self.current_chat][-1].answer += update.delta
                     self.chats = self.chats
                 case UpdateTypes.ai_message_end:
+                    assert isinstance(update, AIEndUpdate)
                     logging.debug("AI message end update")
                     pass
                 case UpdateTypes.tool_start:
+                    assert isinstance(update, ToolStartUpdate)
                     logging.debug("Tool start update")
                     self.chats[self.current_chat][
                         -1
-                    ].answer += f"\n\n---\n\nStarting tool: {update.name} -- ({update.data})\n\n..."
+                    ].answer += (
+                        f"\n\n---\n\nCalling tools: {[call.name for call in update.calls]})\n\n..."
+                    )
                     self.chats = self.chats
-                    self.current_status = f"Starting tool: {update.name} -- ({update.data})"
+                    self.current_status = f"Calling tools: {[call.name for call in update.calls]})"
                 case UpdateTypes.tool_end:
+                    assert isinstance(update, ToolEndUpdate)
                     logging.debug("Tool end update")
-                    self.chats[self.current_chat][
-                        -1
-                    ].answer += f"\n\nEnding tool: {update.name} -- ({update.data})\n\n---\n\n"
-                    self.current_status = f"Ending tool: {update.name} -- ({update.data})"
+                    self.chats[self.current_chat][-1].answer += "\n\nFinished calling tools."
+                    _ = update.tool_responses
+                    self.current_status = "Finished calling tools."
+                case UpdateTypes.graph_end:
+                    assert isinstance(update, GeneralUpdate)
+                    pass
                 case _:
                     logging.debug(f"Unknown update type: {update.type_}")
                     self.current_status = f"Unknown update type: {update.type_}"

@@ -78,8 +78,8 @@ async def call_llm(
     messages: list[BaseMessage] = [
         SystemMessage(system_prompt),
         *state.previous_messages,
-        *state.response_messages,
         HumanMessage(state.question),
+        *state.response_messages,
     ]
     response: BaseMessage = await model.ainvoke(input=messages)
     assert isinstance(response, AIMessage)

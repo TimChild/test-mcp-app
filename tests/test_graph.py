@@ -147,7 +147,7 @@ def graph_adapter() -> GraphAdapter:
 async def test_astream_graph_adapter(graph_adapter: GraphAdapter):
     updates: list[GraphUpdate] = []
     async for update in graph_adapter.astream_updates(input=InputState(question="Hello")):
-        assert isinstance(update, GraphUpdate)
+        assert hasattr(update, "type_")
         updates.append(update)
 
     assert len(updates) > 0

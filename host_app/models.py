@@ -1,11 +1,12 @@
-from dataclasses import dataclass
 from enum import StrEnum
-from typing import Annotated, Any
+from typing import Annotated, Any, Protocol
 
 import reflex as rx
 from langchain_core.messages import (
+    AIMessage,
     AnyMessage,
     BaseMessage,
+    ToolMessage,
 )
 from langchain_core.tools import BaseTool
 from langgraph.graph import add_messages
@@ -34,21 +35,67 @@ class UpdateTypes(StrEnum):
 
     preprocess = "preprocess"
     graph_start = "graph-start"
-    ai_delta = "ai-delta"
+    ai_message_start = "ai-message-start"
+    ai_stream = "ai-delta"
     ai_message_end = "ai-message-end"
     tool_start = "tool-start"
     tool_end = "tool-end"
     graph_end = "graph-end"
+    value_update = "value-update"
 
 
-@dataclass
-class GraphUpdate:
-    """Contents of each update."""
+class GraphUpdate(Protocol):
+    """General protocol for updates."""
 
     type_: UpdateTypes
-    delta: str = ""
-    name: str = ""
-    data: Any = None
+
+
+class GeneralUpdate(rx.Base):
+    """General update for the graph."""
+
+    type_: UpdateTypes
+    data: Any | None = None
+
+
+class AIStartUpdate(rx.Base):
+    """Update for start of AI messages."""
+
+    type_ = UpdateTypes.ai_message_start
+    delta: str
+    metadata: dict[str, Any]
+
+
+class AIStreamUpdate(rx.Base):
+    """Update for streaming AI messages."""
+
+    type_ = UpdateTypes.ai_stream
+    delta: str
+    metadata: dict[str, Any]
+
+
+class AIEndUpdate(rx.Base):
+    """Update for end of AI messages."""
+
+    type_ = UpdateTypes.ai_message_end
+    response: AIMessage
+
+
+class ToolCallInfo(rx.Base):
+    """Info for each tool call."""
+
+    name: str
+    args: dict[str, Any]
+    id: str | None
+
+
+class ToolStartUpdate(rx.Base):
+    type_ = UpdateTypes.tool_start
+    calls: list[ToolCallInfo]
+
+
+class ToolEndUpdate(rx.Base):
+    type_ = UpdateTypes.tool_end
+    tool_responses: list[ToolMessage]
 
 
 class QA(rx.Base):
