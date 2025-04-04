@@ -142,7 +142,7 @@ class State(rx.State):
         question = form_data["question"]
 
         # Check if the question is empty
-        if question == "":
+        if not question:
             return
 
         qa = QA(question=question, answer="")
@@ -168,6 +168,8 @@ class State(rx.State):
                     assert isinstance(update, AIStreamUpdate)
                     self.chats[self.current_chat][-1].answer += update.delta
                     self.chats = self.chats
+                case UpdateTypes.ai_stream_tool_call:
+                    pass
                 case UpdateTypes.ai_message_end:
                     assert isinstance(update, AIEndUpdate)
                     logging.debug("AI message end update")
@@ -177,15 +179,15 @@ class State(rx.State):
                     logging.debug("Tool start update")
                     self.chats[self.current_chat][
                         -1
-                    ].answer += (
-                        f"\n\n---\n\nCalling tools: {[call.name for call in update.calls]})\n\n..."
-                    )
+                    ].answer += f"\n\nCalling tools: {[call.name for call in update.calls]})\n\n..."
                     self.chats = self.chats
                     self.current_status = f"Calling tools: {[call.name for call in update.calls]})"
                 case UpdateTypes.tool_end:
                     assert isinstance(update, ToolEndUpdate)
                     logging.debug("Tool end update")
-                    self.chats[self.current_chat][-1].answer += "\n\nFinished calling tools."
+                    self.chats[self.current_chat][
+                        -1
+                    ].answer += "\n\nFinished calling tools.\n\n---\n\n"
                     _ = update.tool_responses
                     self.current_status = "Finished calling tools."
                 case UpdateTypes.graph_end:

@@ -116,10 +116,9 @@ async def call_tool(
         tools = await client.get_tools()
         logging.debug("Calling tools")
         messages_state = await ToolNode(tools=tools, name="tool_node").ainvoke(
-            input={"messages": state.response_messages}
+            input={"messages": state.response_messages.copy()}
         )
     results = messages_state["messages"]
-    logging.debug("Got tool responses")
     return ToolNodeOutput(response_messages=results)
 
 

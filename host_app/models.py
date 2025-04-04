@@ -37,6 +37,7 @@ class UpdateTypes(StrEnum):
     graph_start = "graph-start"
     ai_message_start = "ai-message-start"
     ai_stream = "ai-delta"
+    ai_stream_tool_call = "ai-tool-call-delta"
     ai_message_end = "ai-message-end"
     tool_start = "tool-start"
     tool_end = "tool-end"
