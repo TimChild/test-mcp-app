@@ -32,7 +32,6 @@ class FullGraphState(BaseModel):
 class UpdateTypes(StrEnum):
     """THe types of update that are sent back for the frontend to display."""
 
-    start = "start"
     preprocess = "preprocess"
     graph_start = "graph-start"
     ai_delta = "ai-delta"
@@ -40,7 +39,6 @@ class UpdateTypes(StrEnum):
     tool_start = "tool-start"
     tool_end = "tool-end"
     graph_end = "graph-end"
-    end = "end"
 
 
 @dataclass

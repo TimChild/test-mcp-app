@@ -50,7 +50,7 @@ class GraphAdapter:
         result = await self.graph.ainvoke(input=input, config=self._make_runnable_config(thread_id))
         return FullGraphState.model_validate(result)
 
-    async def astream_events(
+    async def astream_updates(
         self, input: BaseModel, thread_id: str | None = None
     ) -> AsyncIterator[GraphUpdate]:
         """Run the graph, yield events converted to GraphUpdates."""

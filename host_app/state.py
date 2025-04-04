@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import time
+import uuid
 from typing import Any, AsyncIterator, Mapping, Sequence
 
 import reflex as rx
@@ -12,9 +13,9 @@ from mcp_client import MultiMCPClient
 from reflex.event import EventType
 
 from host_app.containers import Application
+from host_app.graph.langgraph_adapters import GraphAdapter
 
-from .models import QA, GraphUpdate, McpServerInfo, ToolInfo, UpdateTypes
-from .process import get_response_updates
+from .models import QA, GraphUpdate, InputState, McpServerInfo, ToolInfo, UpdateTypes
 
 load_dotenv()
 
@@ -134,18 +135,15 @@ class State(rx.State):
         qa = QA(question=question, answer="")
         self.chats[self.current_chat].append(qa)
         self.processing = True
+        self.current_status = "Starting..."
         yield
 
-        async for update in get_response_updates(
-            question=question,
-            message_history=self.chats[self.current_chat][:-1],
-            conversation_id=self.current_chat,
+        async for update in GraphAdapter().astream_updates(
+            input=InputState(question=question, conversation_id=self.current_chat),
+            thread_id=str(uuid.uuid4()),
         ):
             update: GraphUpdate
             match update.type_:
-                case UpdateTypes.start:
-                    logging.debug("Start update")
-                    self.current_status = f"Starting: {update.data}"
                 case UpdateTypes.ai_delta:
                     logging.debug("AI delta update")
                     self.chats[self.current_chat][-1].answer += update.delta
@@ -166,9 +164,6 @@ class State(rx.State):
                         -1
                     ].answer += f"\n\nEnding tool: {update.name} -- ({update.data})\n\n---\n\n"
                     self.current_status = f"Ending tool: {update.name} -- ({update.data})"
-                case UpdateTypes.end:
-                    logging.debug("End update")
-                    self.current_status = f"Ending: {update.data}"
                 case _:
                     logging.debug(f"Unknown update type: {update.type_}")
                     self.current_status = f"Unknown update type: {update.type_}"

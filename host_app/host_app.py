@@ -13,6 +13,8 @@ from .containers import Application
 
 logging.basicConfig(level=logging.DEBUG)
 
+rx.Cookie
+
 
 def index() -> rx.Component:
     """The main app."""

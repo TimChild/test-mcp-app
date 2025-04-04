@@ -55,6 +55,7 @@ filterwarnings = [
     "ignore::DeprecationWarning:langchain_core",
     "ignore::DeprecationWarning:langgraph",
     "ignore::DeprecationWarning:pydantic.v1.typing",
+    "ignore::RuntimeWarning:pydantic.v1.main",
 
 ]
 

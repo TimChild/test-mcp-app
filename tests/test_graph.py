@@ -77,7 +77,7 @@ def container() -> Iterator[Application]:
                     yield container
 
 
-def test_containers(container: Application):
+def test_container(container: Application):
     """Check the container is set up correctly."""
     conf = container.config.mcp_servers()["example_server"]
     assert isinstance(conf, dict)
@@ -85,6 +85,7 @@ def test_containers(container: Application):
     assert conf["args"] == ["run", "tests/example_server.py"]
     connections = container.mcp_client().connections
     assert "example_server" in connections
+
     # NOTE: connections is a dict[name, SSEConnection | StdioConnection]
     assert "tests/example_server.py" in str(connections["example_server"]), (
         "Should include the path somewhere"
@@ -145,7 +146,7 @@ def graph_adapter() -> GraphAdapter:
 @pytest.mark.usefixtures("mock_chat_model")
 async def test_astream_graph_adapter(graph_adapter: GraphAdapter):
     updates: list[GraphUpdate] = []
-    async for update in graph_adapter.astream_events(input=InputState(question="Hello")):
+    async for update in graph_adapter.astream_updates(input=InputState(question="Hello")):
         assert isinstance(update, GraphUpdate)
         updates.append(update)
 
