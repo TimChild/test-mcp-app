@@ -10,12 +10,14 @@ from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.graph import CompiledGraph
+from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore, Item
 from langgraph.store.memory import InMemoryStore
 from mcp_client import MultiMCPClient
 
 from host_app.containers import Application, config_option_to_connections
-from host_app.graph import GraphAdapter, make_graph
+from host_app.graph import GraphAdapter, make_functional_graph, make_standard_graph
+from host_app.graph.functional_implementation import OutputState
 from host_app.models import FullGraphState, GraphUpdate, InputState, UpdateTypes
 
 EXAMPLE_SERVER_CONFIG = {
@@ -111,23 +113,25 @@ def basic_runnable_config() -> RunnableConfig:
 
 
 def test_compile_graph():
-    graph = make_graph()
+    graph = make_standard_graph()
     assert isinstance(graph, CompiledGraph)
 
 
-@pytest.fixture()
-def graph(mock_chat_model: FakeChatModel) -> CompiledGraph:
+@pytest.fixture(params=["standard", "functional"])
+def graph(request: pytest.FixtureRequest, mock_chat_model: FakeChatModel) -> CompiledGraph | Pregel:
     _ = mock_chat_model
-    return make_graph()
+    if request.param == "functional":
+        return make_functional_graph()
+    else:
+        return make_standard_graph()
 
 
-async def test_invoke_graph(graph: CompiledGraph, basic_runnable_config: RunnableConfig):
+async def test_invoke_graph(graph: CompiledGraph | Pregel, basic_runnable_config: RunnableConfig):
     result: dict[str, Any] = await graph.ainvoke(
         input=InputState(question="Hello"), config=basic_runnable_config
     )
-
-    validated: FullGraphState = FullGraphState.model_validate(result)
-    assert validated.response_messages[0].content == "First response"
+    output: OutputState = OutputState.model_validate(result)
+    assert output.response_messages[0].content == "First response"
 
 
 def test_init_graph_adapter():
