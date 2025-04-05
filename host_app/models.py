@@ -39,7 +39,7 @@ class UpdateTypes(StrEnum):
     ai_stream = "ai-delta"
     ai_stream_tool_call = "ai-tool-call-delta"
     ai_message_end = "ai-message-end"
-    tool_start = "tool-start"
+    tools_start = "tools-start"
     tool_end = "tool-end"
     graph_end = "graph-end"
     value_update = "value-update"
@@ -58,26 +58,32 @@ class GeneralUpdate(rx.Base):
     data: Any | None = None
 
 
+class GraphMetadata(rx.Base):
+    # There are other attributes, but this is the only one needed for now.
+    node: str
+
+
 class AIStartUpdate(rx.Base):
     """Update for start of AI messages."""
 
     type_ = UpdateTypes.ai_message_start
-    delta: str
-    metadata: dict[str, Any]
+    m_id: str
+    metadata: GraphMetadata
 
 
 class AIStreamUpdate(rx.Base):
     """Update for streaming AI messages."""
 
     type_ = UpdateTypes.ai_stream
+    m_id: str
     delta: str
-    metadata: dict[str, Any]
 
 
 class AIEndUpdate(rx.Base):
     """Update for end of AI messages."""
 
     type_ = UpdateTypes.ai_message_end
+    m_id: str
     response: AIMessage
 
 
@@ -89,14 +95,14 @@ class ToolCallInfo(rx.Base):
     id: str | None
 
 
-class ToolStartUpdate(rx.Base):
-    type_ = UpdateTypes.tool_start
+class ToolsStartUpdate(rx.Base):
+    type_ = UpdateTypes.tools_start
     calls: list[ToolCallInfo]
 
 
 class ToolEndUpdate(rx.Base):
     type_ = UpdateTypes.tool_end
-    tool_responses: list[ToolMessage]
+    tool_response: ToolMessage
 
 
 class ToolUse(rx.Base):

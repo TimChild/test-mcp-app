@@ -75,8 +75,6 @@ async def call_tools(tool_calls: list[ToolCall], tools: Sequence[BaseTool]) -> l
             response_tasks.append(tg.create_task(tool.ainvoke(tool_call)))
 
     tool_responses = await asyncio.gather(*response_tasks)
-    for response in tool_responses:
-        print(type(response))
     assert all(isinstance(tool_response, ToolMessage) for tool_response in tool_responses)
     return tool_responses
 

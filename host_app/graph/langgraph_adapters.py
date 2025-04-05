@@ -2,12 +2,13 @@
 
 import logging
 import uuid
-from typing import Any, AsyncIterator, Iterator, Literal, Protocol
+from typing import Any, AsyncIterator, Iterator, Literal, Protocol, TypeGuard
 
 from dependency_injector.wiring import Provide
 from langchain_core.messages import (
     AIMessage,
     AIMessageChunk,
+    AnyMessage,
     ToolMessage,
     ToolMessageChunk,
 )
@@ -23,10 +24,11 @@ from host_app.models import (
     AIStreamUpdate,
     FullGraphState,
     GeneralUpdate,
+    GraphMetadata,
     GraphUpdate,
     ToolCallInfo,
     ToolEndUpdate,
-    ToolStartUpdate,
+    ToolsStartUpdate,
     UpdateTypes,
 )
 
@@ -113,7 +115,7 @@ class GraphAdapter:
         """
         yield GeneralUpdate(type_=UpdateTypes.graph_start, data=thread_id)
 
-        stream_handler = events_to_updates_handler or StreamHandler()
+        stream_handler = events_to_updates_handler or MessagesStreamHandler()
 
         async for event in self.graph.astream(
             input=input,
@@ -127,6 +129,103 @@ class GraphAdapter:
                 yield update
 
         yield GeneralUpdate(type_=UpdateTypes.graph_end)
+
+
+class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
+    """Convert a stream of message chunk events to updates."""
+
+    def __init__(self) -> None:
+        self.streaming_messages: dict[str, AIMessageChunk] = {}
+
+    def handle_stream_event(self, event: LgEvent) -> Iterator[GraphUpdate]:
+        """Handle a stream event from the graph."""
+        if event.mode != "messages":
+            return
+
+        # Extract data from message event
+        m: AIMessageChunk | ToolMessage = event.data[0]
+
+        # Ensure it has an id present
+        if m.id is None:
+            m.id = str(uuid.uuid4())
+
+        m_id: str = m.id
+
+        if self.is_ai_message(m):
+            if self.is_new_ai_message(m_id):
+                yield AIStartUpdate(
+                    m_id=m_id, metadata=GraphMetadata(node=event.data[1]["langgraph_node"])
+                )
+                self.streaming_messages[m_id] = m
+
+            if self.has_content_chunk(m):
+                content = self.ensure_content_is_str(m.content)
+                yield AIStreamUpdate(m_id=m_id, delta=content)
+                updated_message = self.streaming_messages[m_id] + m
+                assert isinstance(updated_message, AIMessageChunk)
+                self.streaming_messages[m_id] = updated_message
+
+            if self.has_tool_call_chunk(m):
+                # Not streaming tool call part for now
+                pass
+
+            if self.is_message_finish(m):
+                full_message = self.streaming_messages.pop(m_id)
+                yield AIEndUpdate(m_id=m_id, response=full_message)
+                if self.has_tool_calls(full_message):
+                    yield self.make_tool_start_update(full_message)
+        elif self.is_tool_message(m):
+            yield ToolEndUpdate(
+                tool_response=m,
+            )
+        else:
+            raise GraphUpdateError(f"Expected AIMessageChunk or ToolMessage, got {type(m)}")
+
+    @staticmethod
+    def is_ai_message(m: AnyMessage) -> TypeGuard[AIMessageChunk]:
+        return isinstance(m, AIMessageChunk)
+
+    @staticmethod
+    def is_tool_message(m: AnyMessage) -> TypeGuard[ToolMessage]:
+        return isinstance(m, ToolMessage)
+
+    def is_new_ai_message(self, m_id: str) -> bool:
+        return m_id not in self.streaming_messages
+
+    @staticmethod
+    def has_content_chunk(m: AIMessageChunk) -> bool:
+        return True if m.content else False
+
+    @staticmethod
+    def ensure_content_is_str(content: str | list[str | dict]) -> str:
+        if not isinstance(content, str):
+            raise GraphUpdateError(f"Expected str content, got {type(content)}")
+        return content
+
+    @staticmethod
+    def has_tool_call_chunk(m: AIMessageChunk) -> bool:
+        return True if m.tool_call_chunks else False
+
+    @staticmethod
+    def is_message_finish(m: AIMessageChunk) -> bool:
+        return m.response_metadata.get("finish_reason", None) is not None
+
+    @staticmethod
+    def has_tool_calls(m: AIMessage) -> bool:
+        return True if m.tool_calls else False
+
+    @staticmethod
+    def make_tool_start_update(full_message: AIMessage) -> ToolsStartUpdate:
+        return ToolsStartUpdate(
+            calls=[
+                ToolCallInfo(
+                    name=call["name"],
+                    args=call["args"],
+                    id=call["id"],
+                )
+                for call in full_message.tool_calls
+            ]
+        )
 
 
 class StreamHandler(EventsToUpdatesHandlerProtocol):
@@ -173,7 +272,7 @@ def get_value_update(
     value_dict: dict, current_message_type: Literal["tool", "ai"] | None
 ) -> Iterator[tuple[GraphUpdate, Literal["tool", "ai", "clear"] | None]]:
     def get_tool_update() -> Iterator[
-        tuple[ToolStartUpdate | ToolEndUpdate, Literal["tool", "clear"]]
+        tuple[ToolsStartUpdate | ToolEndUpdate, Literal["tool", "clear"]]
     ]:
         # This is the end of the tool call
         if "response_messages" not in value_dict:
@@ -194,12 +293,13 @@ def get_value_update(
         if len(tool_responses) == 0:
             raise GraphUpdateError("Expected at least one new tool message")
         logging.info("Yielding ToolEnd")
-        yield (
-            ToolEndUpdate(
-                tool_responses=tool_responses,
-            ),
-            "clear",
-        )
+        for response in tool_responses:
+            yield (
+                ToolEndUpdate(
+                    tool_response=response,
+                ),
+                "clear",
+            )
 
     def get_ai_update() -> Iterator[tuple[GraphUpdate, Literal["ai", "tool", "clear"] | None]]:
         # This is the end of the AI message
@@ -211,16 +311,17 @@ def get_value_update(
         # The latest message is the new AI message
         ai_message = whole_messages[-1]
         assert isinstance(ai_message, AIMessage)
+        m_id = ai_message.id or "no_message_id"
 
         if ai_message.tool_calls:
             logging.info("Yielding AIEnd")
             yield (
-                AIEndUpdate(response=ai_message),
+                AIEndUpdate(m_id=m_id, response=ai_message),
                 None,
             )
             logging.info("Yielding ToolStart")
             yield (
-                ToolStartUpdate(
+                ToolsStartUpdate(
                     calls=[
                         ToolCallInfo(
                             name=call["name"],
@@ -236,6 +337,7 @@ def get_value_update(
             logging.info("Yielding final AIEnd")
             yield (
                 AIEndUpdate(
+                    m_id=m_id,
                     response=ai_message,
                 ),
                 "clear",
@@ -270,16 +372,16 @@ def get_messages_update(
         if current_message_type is None:
             yield (
                 AIStartUpdate(
-                    delta=chunk.content,
-                    metadata=metadata,
+                    m_id=chunk.id or "no_message_id",
+                    metadata=GraphMetadata(node=metadata["langgraph_node"]),
                 ),
                 "ai",
             )
         else:
             yield (
                 AIStreamUpdate(
+                    m_id=chunk.id or "no_message_id",
                     delta=chunk.content,
-                    metadata=metadata,
                 ),
                 None,
             )

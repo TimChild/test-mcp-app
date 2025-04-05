@@ -26,7 +26,7 @@ from .models import (
     McpServerInfo,
     ToolEndUpdate,
     ToolInfo,
-    ToolStartUpdate,
+    ToolsStartUpdate,
     ToolUse,
     UpdateTypes,
 )
@@ -152,6 +152,8 @@ class State(rx.State):
         self.current_status = "Starting..."
         yield
 
+        tool_ended = False
+
         async for update in GraphAdapter().astream_updates(
             input=InputState(question=question, conversation_id=self.current_chat),
             thread_id=str(uuid.uuid4()),
@@ -159,11 +161,19 @@ class State(rx.State):
             update: GraphUpdate
             match update.type_:
                 case UpdateTypes.graph_start:
+                    logging.debug("Graph start update")
                     assert isinstance(update, GeneralUpdate)
                     pass
                 case UpdateTypes.ai_message_start:
+                    logging.debug("AI start update")
                     assert isinstance(update, AIStartUpdate)
-                    pass
+                    if tool_ended:
+                        # Must have just finished getting tool responses
+                        self.chats[self.current_chat][
+                            -1
+                        ].answer += "\n\nFinished calling tool.\n\n---\n\n"
+                        self.current_status = "Finished calling tools."
+                        tool_ended = False
                 case UpdateTypes.ai_stream:
                     logging.debug("AI delta update")
                     assert isinstance(update, AIStreamUpdate)
@@ -172,12 +182,12 @@ class State(rx.State):
                 case UpdateTypes.ai_stream_tool_call:
                     pass
                 case UpdateTypes.ai_message_end:
-                    assert isinstance(update, AIEndUpdate)
                     logging.debug("AI message end update")
+                    assert isinstance(update, AIEndUpdate)
                     pass
-                case UpdateTypes.tool_start:
-                    assert isinstance(update, ToolStartUpdate)
-                    logging.debug("Tool start update")
+                case UpdateTypes.tools_start:
+                    logging.debug("Tools start update")
+                    assert isinstance(update, ToolsStartUpdate)
                     self.chats[self.current_chat][-1].answer += "\n\nCalling tools..."
                     self.chats[self.current_chat][-1].tool_uses.append(
                         ToolUse(tool_names=[call.name for call in update.calls])
@@ -185,18 +195,16 @@ class State(rx.State):
                     self.chats = self.chats
                     self.current_status = f"Calling tools: {[call.name for call in update.calls]})"
                 case UpdateTypes.tool_end:
-                    assert isinstance(update, ToolEndUpdate)
+                    # NOTE: Get update for *each* finished tool
                     logging.debug("Tool end update")
-                    self.chats[self.current_chat][
-                        -1
-                    ].answer += "\n\nFinished calling tools.\n\n---\n\n"
-                    _ = update.tool_responses
-                    self.current_status = "Finished calling tools."
+                    assert isinstance(update, ToolEndUpdate)
+                    tool_ended = True
                 case UpdateTypes.graph_end:
+                    logging.debug("Graph end update")
                     assert isinstance(update, GeneralUpdate)
                     pass
                 case _:
-                    logging.debug(f"Unknown update type: {update.type_}")
+                    logging.info(f"Unknown update type: {update.type_}")
                     self.current_status = f"Unknown update type: {update.type_}"
             yield
 
