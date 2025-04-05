@@ -1,5 +1,5 @@
-debug_mode: true
-use_functional_graph: false
+debug_mode: false
+use_functional_graph: true
 
 logging:
   version: 1
@@ -41,3 +41,6 @@ mcp_servers:
   filesystem:
     command: npx
     args: ["-y", "@modelcontextprotocol/server-filesystem", "~/mcp_allowed/"]
+
+secrets:
+  OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is not set}

@@ -1,5 +1,5 @@
 from .functional_implementation import make_graph as make_functional_graph
 from .graph_implementation import make_graph as make_standard_graph
-from .langgraph_adapters import GraphAdapter
+from .langgraph_adapters import GraphRunAdapter
 
-__all__ = ["GraphAdapter", "make_standard_graph", "make_functional_graph"]
+__all__ = ["GraphRunAdapter", "make_standard_graph", "make_functional_graph"]

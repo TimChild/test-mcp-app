@@ -16,9 +16,9 @@ from langgraph.store.memory import InMemoryStore
 from mcp_client import MultiMCPClient
 
 from host_app.containers import Application, config_option_to_connections
-from host_app.graph import GraphAdapter, make_functional_graph, make_standard_graph
+from host_app.graph import GraphRunAdapter, make_functional_graph, make_standard_graph
 from host_app.graph.functional_implementation import OutputState
-from host_app.models import FullGraphState, GraphUpdate, InputState, UpdateTypes
+from host_app.models import GraphUpdate, InputState, UpdateTypes
 
 EXAMPLE_SERVER_CONFIG = {
     "command": "uv",
@@ -96,6 +96,8 @@ def test_container(container: Application):
     assert isinstance(container.store(), InMemoryStore)
     assert isinstance(container.checkpointer(), MemorySaver)
 
+    assert len(container.config()["secrets"]) > 0
+
 
 @pytest.fixture
 def mock_chat_model(
@@ -118,7 +120,7 @@ def test_compile_graph():
 
 
 @pytest.fixture(params=["standard", "functional"])
-def graph(request: pytest.FixtureRequest, mock_chat_model: FakeChatModel) -> CompiledGraph | Pregel:
+def graph(request: pytest.FixtureRequest, mock_chat_model: FakeChatModel) -> Pregel:
     _ = mock_chat_model
     if request.param == "functional":
         return make_functional_graph()
@@ -126,7 +128,7 @@ def graph(request: pytest.FixtureRequest, mock_chat_model: FakeChatModel) -> Com
         return make_standard_graph()
 
 
-async def test_invoke_graph(graph: CompiledGraph | Pregel, basic_runnable_config: RunnableConfig):
+async def test_invoke_graph(graph: Pregel, basic_runnable_config: RunnableConfig):
     result: dict[str, Any] = await graph.ainvoke(
         input=InputState(question="Hello"), config=basic_runnable_config
     )
@@ -134,21 +136,21 @@ async def test_invoke_graph(graph: CompiledGraph | Pregel, basic_runnable_config
     assert output.response_messages[0].content == "First response"
 
 
-def test_init_graph_adapter():
-    runner = GraphAdapter()
-    assert isinstance(runner, GraphAdapter)
+def test_init_graph_adapter(graph: Pregel):
+    runner = GraphRunAdapter(graph)
+    assert isinstance(runner, GraphRunAdapter)
     connections = runner.mcp_client.connections
     assert isinstance(connections, dict)
     assert list(connections.keys()) == ["example_server"]
 
 
 @pytest.fixture
-def graph_adapter() -> GraphAdapter:
-    return GraphAdapter()
+def graph_adapter(graph: Pregel) -> GraphRunAdapter:
+    return GraphRunAdapter(graph)
 
 
 @pytest.mark.usefixtures("mock_chat_model")
-async def test_astream_graph_adapter(graph_adapter: GraphAdapter):
+async def test_astream_graph_adapter(graph_adapter: GraphRunAdapter):
     updates: list[GraphUpdate] = []
     async for update in graph_adapter.astream_updates(input=InputState(question="Hello")):
         assert hasattr(update, "type_")
@@ -178,7 +180,7 @@ async def test_memory_store_standalone(container: Application):
     assert after2.value == {"value": "value"}
 
 
-async def test_graph_binds_tools(graph_adapter: GraphAdapter, mock_chat_model: FakeChatModel):
+async def test_graph_binds_tools(graph_adapter: GraphRunAdapter, mock_chat_model: FakeChatModel):
     _ = await graph_adapter.ainvoke(input=InputState(question="Hello"))
 
     assert len(mock_chat_model.tools_bound) == 1, "Should bind tools once"
@@ -188,7 +190,7 @@ async def test_graph_binds_tools(graph_adapter: GraphAdapter, mock_chat_model: F
 
 
 @pytest.mark.usefixtures("mock_chat_model")
-async def test_graph_has_memory(graph_adapter: GraphAdapter, container: Application):
+async def test_graph_has_memory(graph_adapter: GraphRunAdapter, container: Application):
     _ = await graph_adapter.ainvoke(
         input=InputState(question="Hello", conversation_id="test-conv-id"),
     )
@@ -223,7 +225,7 @@ async def test_mcp_client_with_missing_server(container: Application):
 
 @pytest.mark.usefixtures("mock_chat_model")
 async def test_graph_runs_with_missing_mcp_server(
-    graph_adapter: GraphAdapter, container: Application
+    graph_adapter: GraphRunAdapter, container: Application
 ):
     """Should still be able to run the graph even if one of the servers is down."""
     with container.config.mcp_servers.override(
@@ -234,18 +236,20 @@ async def test_graph_runs_with_missing_mcp_server(
     ):
         mcp_client = container.mcp_client()
         mcp_client.set_connection_timeout(0.5)
-        response: FullGraphState = await graph_adapter.ainvoke(input=InputState(question="Hello"))
+        response: OutputState = await graph_adapter.ainvoke(input=InputState(question="Hello"))
         assert response.response_messages[0].content == "First response"
 
 
 class TestWithToolCalls:
-    async def test_single_call(self, graph_adapter: GraphAdapter, mock_chat_model: FakeChatModel):
+    async def test_single_call(
+        self, graph_adapter: GraphRunAdapter, mock_chat_model: FakeChatModel
+    ):
         tool_call = ToolCall(id="test-call-id", name="test-tool", args={})
         mock_chat_model.responses = [
             AIMessage(content="", tool_calls=[tool_call]),
             AIMessage("Response after tool call"),
         ]
-        response: FullGraphState = await graph_adapter.ainvoke(input=InputState(question="Hello"))
+        response: OutputState = await graph_adapter.ainvoke(input=InputState(question="Hello"))
 
         first_message = response.response_messages[0]
         assert isinstance(first_message, AIMessage)
@@ -260,7 +264,7 @@ class TestWithToolCalls:
         assert third_message.content == "Response after tool call"
 
     async def test_sequential_calls(
-        self, graph_adapter: GraphAdapter, mock_chat_model: FakeChatModel
+        self, graph_adapter: GraphRunAdapter, mock_chat_model: FakeChatModel
     ):
         tool_call1 = ToolCall(id="test-call-id1", name="test-tool", args={})
         tool_call2 = ToolCall(id="test-call-id2", name="test-tool", args={})
@@ -269,7 +273,7 @@ class TestWithToolCalls:
             AIMessage(content="", tool_calls=[tool_call2]),
             AIMessage("Response after tool calls"),
         ]
-        response: FullGraphState = await graph_adapter.ainvoke(input=InputState(question="Hello"))
+        response: OutputState = await graph_adapter.ainvoke(input=InputState(question="Hello"))
 
         first_message = response.response_messages[0]
         assert isinstance(first_message, AIMessage)

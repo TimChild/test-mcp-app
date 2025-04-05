@@ -1,9 +1,13 @@
+"""The application logic and state management.
+
+I.e. the dynamic behavior of the app.
+"""
+
 import asyncio
 import logging
-import os
 import time
 import uuid
-from typing import Any, AsyncIterator, Mapping, Sequence
+from typing import Any, AsyncIterator, Literal, Mapping, Sequence
 
 import reflex as rx
 from dependency_injector.wiring import Provide, inject
@@ -13,7 +17,7 @@ from mcp_client import MultiMCPClient
 from reflex.event import EventType
 
 from host_app.containers import Application
-from host_app.graph.langgraph_adapters import GraphAdapter
+from host_app.graph import GraphRunAdapter, make_functional_graph, make_standard_graph
 
 from .models import (
     QA,
@@ -32,11 +36,6 @@ from .models import (
 )
 
 load_dotenv()
-
-# Checking if the API key is set properly
-if not os.getenv("OPENAI_API_KEY"):
-    raise Exception("Please set OPENAI_API_KEY environment variable.")
-
 
 DEFAULT_CHATS = {
     "Intros": [],
@@ -71,6 +70,8 @@ class State(rx.State):
 
     mcp_servers: list[McpServerInfo] = []
     """The connected MCP servers."""
+
+    graph_mode: Literal["functional", "standard"] = "functional"
 
     @rx.event
     def set_new_chat_name(self, name: str) -> None:
@@ -152,9 +153,12 @@ class State(rx.State):
         self.current_status = "Starting..."
         yield
 
-        tool_ended = False
+        graph = (
+            make_functional_graph() if self.graph_mode == "functional" else make_standard_graph()
+        )
 
-        async for update in GraphAdapter().astream_updates(
+        tool_ended = False
+        async for update in GraphRunAdapter(graph).astream_updates(
             input=InputState(question=question, conversation_id=self.current_chat),
             thread_id=str(uuid.uuid4()),
         ):

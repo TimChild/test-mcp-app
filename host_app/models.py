@@ -1,15 +1,13 @@
+"""Common data structures used within the app."""
+
 from enum import StrEnum
-from typing import Annotated, Any, Protocol
+from typing import Any, Protocol
 
 import reflex as rx
 from langchain_core.messages import (
     AIMessage,
-    AnyMessage,
-    BaseMessage,
     ToolMessage,
 )
-from langchain_core.tools import BaseTool
-from langgraph.graph import add_messages
 from pydantic import BaseModel
 
 
@@ -17,16 +15,6 @@ class InputState(BaseModel):
     """State required to run the graph."""
 
     question: str
-    conversation_id: str | None = None
-
-
-class FullGraphState(BaseModel):
-    """Full state used by and returned by graph."""
-
-    question: str
-    previous_messages: list[BaseMessage] = []
-    response_messages: Annotated[list[AnyMessage], add_messages]
-    tools: list[BaseTool] = []
     conversation_id: str | None = None
 
 

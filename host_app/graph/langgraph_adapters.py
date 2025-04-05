@@ -1,4 +1,12 @@
-"""Regular graph version of langgraph."""
+"""Adapter from langgraph to updates usable by the app.
+
+This is effectively a buffer layer between the very fast changing langchain/langgraph
+ecosystem and the rest of the app.
+
+This makes it easier to address breaking changes.
+
+This also translates the lg events into more useful updates for triggering UI events.
+"""
 
 import logging
 import uuid
@@ -9,19 +17,20 @@ from langchain_core.messages import (
     AIMessage,
     AIMessageChunk,
     AnyMessage,
+    BaseMessage,
     ToolMessage,
 )
 from langchain_core.runnables import RunnableConfig
-from langgraph.graph.graph import CompiledGraph
+from langgraph.pregel import Pregel
 from mcp_client import MultiMCPClient
 from pydantic import BaseModel
 
 from host_app.containers import Application
+from host_app.graph.functional_implementation import OutputState
 from host_app.models import (
     AIEndUpdate,
     AIStartUpdate,
     AIStreamUpdate,
-    FullGraphState,
     GeneralUpdate,
     GraphMetadata,
     GraphUpdate,
@@ -31,67 +40,51 @@ from host_app.models import (
     UpdateTypes,
 )
 
-from .functional_implementation import make_graph as make_functional_graph
-from .graph_implementation import make_graph as make_standard_graph
-
 
 class LgEvent(BaseModel):
-    """Event emitted by the graph."""
+    """Structure of event emitted by langgraph."""
 
     mode: Literal["values", "messages"]
     data: Any
 
 
 class GraphUpdateError(Exception):
+    """Base for any errors raised during conversion of events to updates."""
+
     pass
 
 
 class EventsToUpdatesHandlerProtocol(Protocol):
+    """Basic protocol for converting events to updates."""
+
     def handle_stream_event(self, event: LgEvent) -> Iterator[GraphUpdate]:
-        """Handle a stream event from the graph."""
+        """Take an event and return an iterable of updates."""
         raise NotImplementedError("handle_stream_event not implemented")
 
+    def reset(self) -> None:
+        """Reset the handler for a new stream."""
+        raise NotImplementedError("reset not implemented")
 
-class FunctionalAdapter:
-    pass
 
-
-class GraphAdapter:
-    """Adapter between langgraph graph and rest of app.
-
-    Use this to call langgraph graphs and convert events/values to a representation
-    used by the rest of the app (e.g. rx.Base models).
-
-    This is primarily to protect against the rapidly changing langchain ecosystem.
-    Avoid relying on langgraph/langchain throughout app so that this is a centralized
-    location to update code on breaking changes.
-    """
+class GraphRunAdapter:
+    """Adapter for running a langgraph graph and returning custom updates instead of langgraph events."""
 
     def __init__(
         self,
-        graph: CompiledGraph | None = None,
+        graph: Pregel,
+        stream_handler: EventsToUpdatesHandlerProtocol | None = None,
         mcp_client: MultiMCPClient = Provide[Application.mcp_client],
-        use_functional_graph: bool = Provide[Application.config.use_functional_graph],
     ) -> None:
-        if graph is not None:
-            self.graph = graph
-        else:
-            if use_functional_graph:
-                self.graph = make_functional_graph()
-            else:
-                self.graph = make_standard_graph()
-
-        self.mcp_client = mcp_client
-        self.functional_mode = use_functional_graph
-
-    def _make_runnable_config(self, thread_id: str | None = None) -> RunnableConfig:
-        return RunnableConfig(
-            configurable={"thread_id": thread_id or str(uuid.uuid4())},
+        self.graph = graph
+        self.stream_handler = stream_handler or MessagesStreamHandler(
+            listen_nodes=["call_tools", "call_llm", "graph"]
         )
+        self.mcp_client = mcp_client
 
-    async def ainvoke(self, input: BaseModel, thread_id: str | None = None) -> FullGraphState:
+    async def ainvoke(self, input: BaseModel, thread_id: str | None = None) -> OutputState:
+        """Run the graph and only return the final output."""
         result = await self.graph.ainvoke(input=input, config=self._make_runnable_config(thread_id))
-        return FullGraphState.model_validate(result)
+        return OutputState.model_validate(result)
 
     async def astream_updates(
         self,
@@ -115,17 +108,16 @@ class GraphAdapter:
         """
         yield GeneralUpdate(type_=UpdateTypes.graph_start, data=thread_id)
 
-        listen_nodes = (
-            ["graph", "call_tools"] if self.functional_mode else ["call_tools", "call_llm"]
-        )
-        stream_handler = events_to_updates_handler or MessagesStreamHandler(
-            listen_nodes=listen_nodes
-        )
+        stream_handler = events_to_updates_handler or self.stream_handler
+        stream_handler.reset()
 
         async for event in self.graph.astream(
             input=input,
             config=self._make_runnable_config(thread_id),
-            stream_mode=["messages", "values"],  # otherwise defaults to only "values"
+            stream_mode=[
+                "messages",
+                "values",
+            ],  # otherwise defaults to only "values" but we want message chunks
         ):
             assert isinstance(event, tuple)
             assert len(event) == 2
@@ -135,6 +127,11 @@ class GraphAdapter:
 
         yield GeneralUpdate(type_=UpdateTypes.graph_end)
 
+    def _make_runnable_config(self, thread_id: str | None = None) -> RunnableConfig:
+        return RunnableConfig(
+            configurable={"thread_id": thread_id or str(uuid.uuid4())},
+        )
+
 
 class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
     """Convert a stream of message chunk events to updates."""
@@ -143,16 +140,31 @@ class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
         self.listen_nodes = listen_nodes
         self.streaming_messages: dict[str, AIMessageChunk] = {}
 
+    def reset(self) -> None:
+        """Reset the handler for a new stream."""
+        self.streaming_messages = {}
+
     def handle_stream_event(self, event: LgEvent) -> Iterator[GraphUpdate]:
-        """Handle a stream event from the graph."""
+        """Handle a stream event from the graph.
+
+        Yields:
+            - AIStartUpdate: On new AI message
+            - AIStreamUpdate: With delta content for AI message
+            - AIEndUpdate: On AI message end
+            - ToolStartUpdate: After AI has made tool calls (single update for multiple calls)
+            - ToolEndUpdate: With response from tool (an update per tool response)
+        """
         if event.mode != "messages":
+            # Ignore non-message events
             return
         lg_metadata = event.data[1]
         if lg_metadata["langgraph_node"] not in self.listen_nodes:
+            # Ignore events from nodes we are not listening to
             return
 
         # Extract data from message event
         m: AIMessageChunk | ToolMessage = event.data[0]
+        assert isinstance(m, BaseMessage)
 
         # Ensure it has an id present
         if m.id is None:
@@ -181,14 +193,16 @@ class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
                 full_message = self.streaming_messages.pop(m_id)
                 yield AIEndUpdate(m_id=m_id, response=full_message)
                 if self.has_tool_calls(full_message):
+                    # update now because no other notification of tool calls until tool responses returned
                     yield self.make_tool_start_update(full_message)
+
         elif self.is_tool_message(m):
             yield ToolEndUpdate(
                 tool_response=m,
             )
         else:
             node = lg_metadata["langgraph_node"]
-            logging.error(f"Ignoring unexpected message update ({node}): {m}")
+            logging.warning(f"Ignoring unexpected message update from: {node=}, {m.type=}")
 
     @staticmethod
     def is_ai_message(m: AnyMessage) -> TypeGuard[AIMessageChunk]:

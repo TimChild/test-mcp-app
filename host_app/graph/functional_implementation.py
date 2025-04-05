@@ -131,7 +131,6 @@ def make_graph(
 
         async with mcp_client as client:
             tools = await client.get_tools()
-
             model = chat_model.bind_tools(tools)
 
             previous_messages = await load_previous_messages(

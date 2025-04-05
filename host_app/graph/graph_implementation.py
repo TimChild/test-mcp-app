@@ -1,12 +1,13 @@
-"""Regular graph version of langgraph."""
+"""Regular graph implementation of langgraph."""
 
 import logging
-from typing import Literal, Sequence
+from typing import Annotated, Literal, Sequence
 
 from dependency_injector.wiring import Provide, inject
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
+    AnyMessage,
     BaseMessage,
     HumanMessage,
     SystemMessage,
@@ -16,7 +17,7 @@ from langchain_core.messages import (
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph, add_messages
 from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import ToolNode
 from langgraph.store.base import BaseStore
@@ -26,7 +27,17 @@ from mcp_client import MultiMCPClient
 from pydantic import BaseModel
 
 from host_app.containers import Application
-from host_app.models import FullGraphState, InputState
+from host_app.models import InputState
+
+
+class FullGraphState(BaseModel):
+    """Full state used by and returned by graph."""
+
+    question: str
+    previous_messages: list[BaseMessage] = []
+    response_messages: Annotated[list[AnyMessage], add_messages]
+    tools: list[BaseTool] = []
+    conversation_id: str | None = None
 
 
 class LoadMessagesOutput(BaseModel):
@@ -61,7 +72,6 @@ class CallLLMOutput(BaseModel):
 @inject
 async def call_llm(
     state: FullGraphState,
-    store: BaseStore,
     mcp_client: MultiMCPClient = Provide[Application.mcp_client],
     chat_model: BaseChatModel = Provide[Application.main_model],
     system_prompt: str = Provide[Application.config.system_prompt],

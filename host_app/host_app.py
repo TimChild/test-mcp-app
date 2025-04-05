@@ -30,9 +30,17 @@ def index() -> rx.Component:
     )
 
 
+def check_secrets_not_null(secrets: dict[str, str]) -> None:
+    """Check that all secrets specified contain a value."""
+    for k, v in secrets.items():
+        if not v:
+            raise ValueError(f"Missing secret: {k}")
+
+
 def make_app() -> rx.App:
     container = Application()
     container.init_resources()
+    check_secrets_not_null(container.config.secrets())
 
     # Add state and page to the app.
     app = rx.App(

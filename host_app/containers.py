@@ -1,3 +1,11 @@
+"""Containers for dependency injection.
+
+Any depenendencies of the application should be defined here.
+
+This makes it easier to override dependencies for testing, and for centralizing application
+configuration in a single config file.
+"""
+
 import logging.config
 from typing import Any
 
@@ -12,7 +20,7 @@ from mcp_client.multi_client import SSEConnection, StdioConnection
 def config_option_to_connections(
     simple_config_dict: dict[str, dict[str, Any]],
 ) -> dict[str, StdioConnection | SSEConnection]:
-    """Convert the mcp config dict from yaml to Connections.
+    """Convert the mcp config dict from yaml to Connection instances.
 
     Basically just determine which type of connection, then check that the args are specified
     correctly for that connection type.
@@ -46,12 +54,16 @@ def config_option_to_connections(
 
 
 class Application(containers.DeclarativeContainer):
+    """The main application container for dependency injection."""
+
     config = providers.Configuration(yaml_files=["config.yml"], strict=True)
+    "Load application configuration from config.yml"
 
     logging = providers.Resource(
         logging.config.dictConfig,
         config=config.logging,
     )
+    "Initialize logging from config (validating the parameters)"
 
     mcp_client = providers.Factory(
         MultiMCPClient,
@@ -60,12 +72,20 @@ class Application(containers.DeclarativeContainer):
             config.mcp_servers,
         ),
     )
+    "Single interface for working with multiple MCP clients"
+
     main_model = providers.Factory(
         ChatOpenAI,
         model="gpt-4o",
+        api_key=config.secrets.OPENAI_API_KEY,
     )
+    "The main LLM model to use for completions"
+
     checkpointer = providers.Singleton(MemorySaver)
+    "Persistence provider for langgraph runs (e.g. enables interrupt/resume)"
+
     store = providers.Singleton(InMemoryStore)
+    "Persistence provider for langgraph data (e.g. enables persisting data between runs)"
 
     wiring_config = containers.WiringConfiguration(
         modules=[
@@ -74,3 +94,5 @@ class Application(containers.DeclarativeContainer):
         ],
         packages=[".graph"],
     )
+    """Configures the dependency injection wiring for the application. I.e., which modules/packages
+    require injections to be performed."""
