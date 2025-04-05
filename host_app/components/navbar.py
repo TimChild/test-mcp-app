@@ -1,6 +1,6 @@
 import reflex as rx
 
-from host_app.models import McpServerInfo
+from host_app.models import McpServerInfo, ToolInfo
 from host_app.state import State
 
 
@@ -86,6 +86,15 @@ def modal(trigger: rx.Component) -> rx.Component:
 
 
 def connected_mcp_server_infos() -> rx.Component:
+    def render_tool_info(tool_info: ToolInfo) -> rx.Component:
+        return rx.hstack(
+            rx.tooltip(
+                rx.badge(tool_info.name),
+                content=tool_info.description,
+            ),
+            spacing="1",
+        )
+
     def render_mcp_server_info(server_info: McpServerInfo) -> rx.Component:
         return rx.card(
             rx.inset(rx.heading(server_info.name), padding="1em", side="top"),
@@ -94,7 +103,7 @@ def connected_mcp_server_infos() -> rx.Component:
                     rx.data_list.label("Tools"),
                     rx.data_list.value(
                         rx.flex(
-                            rx.foreach(server_info.tools, lambda tool: rx.badge(tool.name)),
+                            rx.foreach(server_info.tools, render_tool_info),
                             wrap="wrap",
                             spacing="1",
                         )
