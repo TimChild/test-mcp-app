@@ -27,6 +27,7 @@ from .models import (
     ToolEndUpdate,
     ToolInfo,
     ToolStartUpdate,
+    ToolUse,
     UpdateTypes,
 )
 
@@ -177,9 +178,10 @@ class State(rx.State):
                 case UpdateTypes.tool_start:
                     assert isinstance(update, ToolStartUpdate)
                     logging.debug("Tool start update")
-                    self.chats[self.current_chat][
-                        -1
-                    ].answer += f"\n\nCalling tools: {[call.name for call in update.calls]})\n\n..."
+                    self.chats[self.current_chat][-1].answer += "\n\nCalling tools..."
+                    self.chats[self.current_chat][-1].tool_uses.append(
+                        ToolUse(tool_names=[call.name for call in update.calls])
+                    )
                     self.chats = self.chats
                     self.current_status = f"Calling tools: {[call.name for call in update.calls]})"
                 case UpdateTypes.tool_end:
