@@ -16,7 +16,6 @@ from langchain_core.messages import (
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.constants import END
 from langgraph.graph import StateGraph
 from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import ToolNode
@@ -30,15 +29,14 @@ from host_app.containers import Application
 from host_app.models import FullGraphState, InputState
 
 
-class InitializeOutput(BaseModel):
+class LoadMessagesOutput(BaseModel):
     previous_messages: list[BaseMessage] = []
 
 
-@inject
-async def initialize(
+async def load_previous_messages(
     state: InputState,
     store: BaseStore,
-) -> InitializeOutput:
+) -> LoadMessagesOutput:
     question = state.question
     logging.debug(f"Processing question: {question}")
 
@@ -51,7 +49,7 @@ async def initialize(
             previous_messages = messages_from_dict(found.value["messages"])
     else:
         previous_messages = []
-    return InitializeOutput(
+    return LoadMessagesOutput(
         previous_messages=previous_messages,
     )
 
@@ -67,7 +65,7 @@ async def call_llm(
     mcp_client: MultiMCPClient = Provide[Application.mcp_client],
     chat_model: BaseChatModel = Provide[Application.main_model],
     system_prompt: str = Provide[Application.config.system_prompt],
-) -> Command[Literal["tool_node", "__end__"]]:
+) -> Command[Literal["tool_node", "save_messages"]]:
     if not state.tools:
         async with mcp_client as client:
             tools = await client.get_tools()
@@ -87,15 +85,27 @@ async def call_llm(
 
     if response.tool_calls:
         return Command(update=update, goto="tool_node")
+    return Command(update=update, goto="save_messages")
 
+
+async def save_messages(
+    state: FullGraphState,
+    store: BaseStore,
+) -> None:
     if state.conversation_id:
         logging.debug(f"Saving messages for conversation ID: {state.conversation_id}")
         await store.aput(
             namespace=("messages",),
             key=state.conversation_id,
-            value={"messages": messages_to_dict(messages + [response])},
+            value={
+                "messages": messages_to_dict(
+                    state.previous_messages
+                    + [HumanMessage(state.question)]
+                    + state.response_messages
+                )
+            },
         )
-    return Command(update=update, goto=END)
+    return
 
 
 class ToolNodeInput(BaseModel):
@@ -108,7 +118,7 @@ class ToolNodeOutput(BaseModel):
 
 
 @inject
-async def call_tool(
+async def call_tools(
     state: ToolNodeInput,
     mcp_client: MultiMCPClient = Provide[Application.mcp_client],
 ) -> ToolNodeOutput:
@@ -132,14 +142,16 @@ def make_graph(
     store = store or InMemoryStore()
 
     graph = StateGraph(state_schema=FullGraphState)
-    graph.add_node("initialize", initialize)
+    graph.add_node("load_previous_messages", load_previous_messages)
     graph.add_node("call_llm", call_llm)
-    graph.add_node("tool_node", call_tool)
+    graph.add_node("tool_node", call_tools)
+    graph.add_node("save_messages", save_messages)
 
-    graph.set_entry_point("initialize")
-    graph.add_edge("initialize", "call_llm")
+    graph.set_entry_point("load_previous_messages")
+    graph.add_edge("load_previous_messages", "call_llm")
     graph.add_edge("tool_node", "call_llm")
-    # call_llm directs to tool_node or __end__
+    # call_llm directs to tool_node or save_messages
+    graph.set_finish_point("save_messages")
 
     compiled_graph = graph.compile(
         checkpointer=checkpointer,

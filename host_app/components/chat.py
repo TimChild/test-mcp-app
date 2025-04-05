@@ -32,7 +32,7 @@ def message(qa: QA) -> rx.Component:
 
         return rx.box(
             rx.hstack(
-                "Calling tools:",
+                "Tools Called:",
                 rx.foreach(tool_use.tool_calls, render_tool_call),
                 align="center",
                 wrap="wrap",

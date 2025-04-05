@@ -188,7 +188,7 @@ class State(rx.State):
                 case UpdateTypes.tools_start:
                     logging.debug("Tools start update")
                     assert isinstance(update, ToolsStartUpdate)
-                    self.chats[self.current_chat][-1].answer += "\n\nCalling tools..."
+                    self.chats[self.current_chat][-1].answer += "\n\n---\n\nCalling tools..."
                     self.chats[self.current_chat][-1].tool_uses.append(
                         ToolsUse(tool_calls=update.calls)
                     )

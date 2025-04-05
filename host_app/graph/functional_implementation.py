@@ -15,6 +15,7 @@ from langchain_core.messages import (
     ToolCall,
     ToolMessage,
     messages_from_dict,
+    messages_to_dict,
 )
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -41,8 +42,32 @@ async def load_previous_messages(
     if conversation_id:
         loaded = await store.aget(namespace=("messages",), key=conversation_id)
         if loaded:
+            logging.debug("Loaded previous messages")
             previous_messages = messages_from_dict(loaded.value["messages"])
     return previous_messages
+
+
+@task
+async def save_messages(
+    store: BaseStore,
+    conversation_id: str,
+    previous_messages: Sequence[BaseMessage],
+    question: str,
+    responses: Sequence[BaseMessage],
+) -> None:
+    await store.aput(
+        namespace=("messages",),
+        key=conversation_id,
+        value={
+            "messages": messages_to_dict(
+                [
+                    *previous_messages,
+                    HumanMessage(question),
+                    *responses,
+                ]
+            )
+        },
+    )
 
 
 class CallToolsInput(BaseModel):
@@ -76,6 +101,7 @@ async def call_tools(tool_calls: list[ToolCall], tools: Sequence[BaseTool]) -> l
 
     tool_responses = await asyncio.gather(*response_tasks)
     assert all(isinstance(tool_response, ToolMessage) for tool_response in tool_responses)
+    logging.debug("Returning from call_tools")
     return tool_responses
 
 
@@ -135,6 +161,16 @@ def make_graph(
                 )
                 message_history.extend(tool_responses)
                 responses.extend(tool_responses)
+
+        # Save the messages to the store
+        if inputs.conversation_id:
+            await save_messages(
+                store=store,
+                conversation_id=inputs.conversation_id,
+                previous_messages=previous_messages,
+                question=question,
+                responses=responses,
+            )
 
         return OutputState(response_messages=responses)
 

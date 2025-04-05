@@ -82,6 +82,7 @@ class GraphAdapter:
                 self.graph = make_standard_graph()
 
         self.mcp_client = mcp_client
+        self.functional_mode = use_functional_graph
 
     def _make_runnable_config(self, thread_id: str | None = None) -> RunnableConfig:
         return RunnableConfig(
@@ -114,7 +115,12 @@ class GraphAdapter:
         """
         yield GeneralUpdate(type_=UpdateTypes.graph_start, data=thread_id)
 
-        stream_handler = events_to_updates_handler or MessagesStreamHandler()
+        listen_nodes = (
+            ["graph", "call_tools"] if self.functional_mode else ["call_tools", "call_llm"]
+        )
+        stream_handler = events_to_updates_handler or MessagesStreamHandler(
+            listen_nodes=listen_nodes
+        )
 
         async for event in self.graph.astream(
             input=input,
@@ -133,12 +139,16 @@ class GraphAdapter:
 class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
     """Convert a stream of message chunk events to updates."""
 
-    def __init__(self) -> None:
+    def __init__(self, listen_nodes: list[str]) -> None:
+        self.listen_nodes = listen_nodes
         self.streaming_messages: dict[str, AIMessageChunk] = {}
 
     def handle_stream_event(self, event: LgEvent) -> Iterator[GraphUpdate]:
         """Handle a stream event from the graph."""
         if event.mode != "messages":
+            return
+        lg_metadata = event.data[1]
+        if lg_metadata["langgraph_node"] not in self.listen_nodes:
             return
 
         # Extract data from message event
@@ -153,7 +163,7 @@ class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
         if self.is_ai_message(m):
             if self.is_new_ai_message(m_id):
                 yield AIStartUpdate(
-                    m_id=m_id, metadata=GraphMetadata(node=event.data[1]["langgraph_node"])
+                    m_id=m_id, metadata=GraphMetadata(node=lg_metadata["langgraph_node"])
                 )
                 self.streaming_messages[m_id] = m
 
@@ -177,7 +187,8 @@ class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
                 tool_response=m,
             )
         else:
-            logging.error(f"Ignoring unexpected message update: {m}")
+            node = lg_metadata["langgraph_node"]
+            logging.error(f"Ignoring unexpected message update ({node}): {m}")
 
     @staticmethod
     def is_ai_message(m: AnyMessage) -> TypeGuard[AIMessageChunk]:
