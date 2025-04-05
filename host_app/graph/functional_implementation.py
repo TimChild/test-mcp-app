@@ -112,7 +112,7 @@ def make_graph(
                 conversation_id=inputs.conversation_id, store=store
             )
 
-            messages: list[BaseMessage] = [
+            message_history: list[BaseMessage] = [
                 SystemMessage(system_prompt),
                 *previous_messages,
                 HumanMessage(question),
@@ -122,9 +122,10 @@ def make_graph(
             for i in range(max_iterations):
                 logging.debug(f"Iteration {i}")
 
-                ai_message: BaseMessage = await model.ainvoke(input=messages)
+                ai_message: BaseMessage = await model.ainvoke(input=message_history)
                 assert isinstance(ai_message, AIMessage)
-                messages.append(ai_message)
+                message_history.append(ai_message)
+                responses.append(ai_message)
 
                 if not ai_message.tool_calls:
                     break
@@ -132,7 +133,8 @@ def make_graph(
                 tool_responses: list[ToolMessage] = await call_tools(
                     ai_message.tool_calls, tools=tools
                 )
-                messages.extend(tool_responses)
+                message_history.extend(tool_responses)
+                responses.extend(tool_responses)
 
         return OutputState(response_messages=responses)
 
