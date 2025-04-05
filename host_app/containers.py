@@ -11,6 +11,7 @@ from typing import Any
 
 from dependency_injector import containers, providers
 from dotenv import load_dotenv
+from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
@@ -78,10 +79,17 @@ class Application(containers.DeclarativeContainer):
     )
     "Single interface for working with multiple MCP clients"
 
-    main_model = providers.Factory(
-        ChatOpenAI,
-        model="gpt-4o",
-        api_key=config.secrets.OPENAI_API_KEY,
+    llm_models = providers.Dict(
+        openai_gpt4o=providers.Factory(
+            ChatOpenAI,
+            model="gpt-4o",
+            api_key=config.secrets.OPENAI_API_KEY,
+        ),
+        antropic_claude_sonnet=providers.Factory(
+            ChatAnthropic,
+            model="claude-3-7-sonnet-latest",
+            api_key=config.secrets.ANTHROPIC_API_KEY,
+        ),
     )
     "The main LLM model to use for completions"
 

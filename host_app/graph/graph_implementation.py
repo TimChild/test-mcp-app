@@ -14,6 +14,7 @@ from langchain_core.messages import (
     messages_from_dict,
     messages_to_dict,
 )
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
@@ -72,8 +73,10 @@ class CallLLMOutput(BaseModel):
 @inject
 async def call_llm(
     state: FullGraphState,
+    config: RunnableConfig,
     mcp_client: MultiMCPClient = Provide[Application.mcp_client],
-    chat_model: BaseChatModel = Provide[Application.main_model],
+    available_models: dict[str, BaseChatModel] = Provide[Application.llm_models],
+    default_model: str = Provide[Application.config.default_model],
     system_prompt: str = Provide[Application.config.system_prompt],
 ) -> Command[Literal["tool_node", "save_messages"]]:
     if not state.tools:
@@ -82,6 +85,7 @@ async def call_llm(
     else:
         tools = state.tools
 
+    chat_model = available_models[config.get("configurable", {}).get("model_name", default_model)]
     model = chat_model.bind_tools(tools)
     messages: list[BaseMessage] = [
         SystemMessage(system_prompt),

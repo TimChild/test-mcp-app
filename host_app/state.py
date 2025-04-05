@@ -69,6 +69,7 @@ class State(rx.State):
     """The connected MCP servers."""
 
     graph_mode: Literal["functional", "standard"] = "functional"
+    model_name: Literal["openai_gpt4o", "antropic_claude_sonnet"] | None = "antropic_claude_sonnet"
 
     @rx.event
     def set_new_chat_name(self, name: str) -> None:
@@ -171,6 +172,7 @@ class State(rx.State):
         async for update in GraphRunAdapter(graph).astream_updates(
             input=InputState(question=question, conversation_id=self.current_chat),
             thread_id=str(uuid.uuid4()),
+            llm_model=self.model_name,
         ):
             update: GraphUpdate
             match update.type_:

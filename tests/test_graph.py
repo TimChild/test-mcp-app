@@ -73,7 +73,7 @@ def container() -> Iterator[Application]:
     container = Application()
     container.config.from_yaml("config.yml")
     with container.config.mcp_servers.override({"example_server": EXAMPLE_SERVER_CONFIG}):
-        with container.main_model.override(NotSetModel()):
+        with container.llm_models.override({container.config.default_model(): NotSetModel()}):
             with container.store.override(InMemoryStore()):
                 with container.checkpointer.override(MemorySaver()):
                     yield container
@@ -103,7 +103,7 @@ def test_container(container: Application):
 def mock_chat_model(
     container: Application, fake_chat_model: FakeChatModel
 ) -> Iterator[FakeChatModel]:
-    with container.main_model.override(fake_chat_model):
+    with container.llm_models.override({container.config.default_model(): fake_chat_model}):
         yield fake_chat_model
 
 

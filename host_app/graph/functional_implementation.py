@@ -17,6 +17,7 @@ from langchain_core.messages import (
     messages_from_dict,
     messages_to_dict,
 )
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.func import entrypoint, task
@@ -115,7 +116,8 @@ def make_graph(
     store: BaseStore = Provide[Application.store],
     system_prompt: str = Provide[Application.config.system_prompt],
     mcp_client: MultiMCPClient = Provide[Application.mcp_client],
-    chat_model: BaseChatModel = Provide[Application.main_model],
+    default_model: str = Provide[Application.config.default_model],
+    available_models: dict[str, BaseChatModel] = Provide[Application.llm_models],
     max_iterations: int = 10,
 ) -> Pregel:
     """Create a graph with the given checkpointer and store."""
@@ -124,6 +126,7 @@ def make_graph(
     async def graph(
         inputs: InputState,
         store: BaseStore,
+        config: RunnableConfig,
     ) -> OutputState:
         responses: list[AIMessage | ToolMessage] = []
         question = inputs.question
@@ -131,6 +134,9 @@ def make_graph(
 
         async with mcp_client as client:
             tools = await client.get_tools()
+            chat_model = available_models[
+                config.get("configurable", {}).get("model_name", default_model)
+            ]
             model = chat_model.bind_tools(tools)
 
             previous_messages = await load_previous_messages(

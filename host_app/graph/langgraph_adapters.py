@@ -89,6 +89,7 @@ class GraphRunAdapter:
     async def astream_updates(
         self,
         input: BaseModel,
+        llm_model: Literal["openai_gpt4o", "antropic_claude_sonnet"] | None = None,
         thread_id: str | None = None,
         events_to_updates_handler: EventsToUpdatesHandlerProtocol | None = None,
     ) -> AsyncIterator[GraphUpdate]:
@@ -113,7 +114,7 @@ class GraphRunAdapter:
 
         async for event in self.graph.astream(
             input=input,
-            config=self._make_runnable_config(thread_id),
+            config=self._make_runnable_config(thread_id, llm_model),
             stream_mode=[
                 "messages",
                 "values",
@@ -127,10 +128,13 @@ class GraphRunAdapter:
 
         yield GeneralUpdate(type_=UpdateTypes.graph_end)
 
-    def _make_runnable_config(self, thread_id: str | None = None) -> RunnableConfig:
-        return RunnableConfig(
-            configurable={"thread_id": thread_id or str(uuid.uuid4())},
-        )
+    def _make_runnable_config(
+        self, thread_id: str | None = None, llm_model: str | None = None
+    ) -> RunnableConfig:
+        config = {"thread_id": thread_id or str(uuid.uuid4())}
+        if llm_model:
+            config["model_name"] = llm_model
+        return RunnableConfig(configurable=config)
 
 
 class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
