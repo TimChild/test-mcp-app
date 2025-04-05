@@ -146,7 +146,7 @@ async def call_tools(
 def make_graph(
     checkpointer: BaseCheckpointSaver | None = Provide[Application.checkpointer],
     store: BaseStore | None = Provide[Application.store],
-    debug_mode: bool = Provide[Application.config.debug_mode],
+    debug_mode: bool = False,
 ) -> CompiledGraph:
     checkpointer = checkpointer or MemorySaver()
     store = store or InMemoryStore()

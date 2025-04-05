@@ -11,7 +11,6 @@ from typing import Any, AsyncIterator, Literal, Mapping, Sequence
 
 import reflex as rx
 from dependency_injector.wiring import Provide, inject
-from dotenv import load_dotenv
 from langchain_core.tools import BaseTool
 from mcp_client import MultiMCPClient
 from reflex.event import EventType
@@ -34,8 +33,6 @@ from .models import (
     ToolsUse,
     UpdateTypes,
 )
-
-load_dotenv()
 
 DEFAULT_CHATS = {
     "Intros": [],
@@ -139,7 +136,8 @@ class State(rx.State):
             await asyncio.sleep(0.5)
 
     @rx.event
-    async def handle_send_click(self, form_data: dict[str, Any]) -> AsyncIterator[EventType | None]:
+    async def handle_send_click(self, form_data: dict[str, Any]) -> EventType | None:
+        """Handle user clicking the send button."""
         # Get the question from the form
         question = form_data["question"]
 
@@ -147,17 +145,29 @@ class State(rx.State):
         if not question:
             return
 
+        # Initialize new QA object
         qa = QA(question=question, answer="")
         self.chats[self.current_chat].append(qa)
         self.processing = True
         self.current_status = "Starting..."
-        yield
+        self.question = question
+        # Switch to background task because it could take a while to run
+        return State.run_request_in_background
 
+    @rx.event(background=True)
+    async def run_request_in_background(self) -> AsyncIterator[EventType | None]:
+        question = self.question
+
+        # Build the functional or standard graph to run
         graph = (
             make_functional_graph() if self.graph_mode == "functional" else make_standard_graph()
         )
 
+        # (since we get updates per tool, we can only check that all tools are done when we
+        #  get the next AI message)
         tool_ended = False
+
+        # Run the graph via the adapter, handling updates.
         async for update in GraphRunAdapter(graph).astream_updates(
             input=InputState(question=question, conversation_id=self.current_chat),
             thread_id=str(uuid.uuid4()),
@@ -173,16 +183,18 @@ class State(rx.State):
                     assert isinstance(update, AIStartUpdate)
                     if tool_ended:
                         # Must have just finished getting tool responses
-                        self.chats[self.current_chat][
-                            -1
-                        ].answer += "\n\nFinished calling tool.\n\n---\n\n"
-                        self.current_status = "Finished calling tools."
+                        async with self:
+                            self.chats[self.current_chat][
+                                -1
+                            ].answer += "\n\nFinished calling tool.\n\n---\n\n"
+                            self.current_status = "Finished calling tools."
                         tool_ended = False
                 case UpdateTypes.ai_stream:
                     logging.debug("AI delta update")
                     assert isinstance(update, AIStreamUpdate)
-                    self.chats[self.current_chat][-1].answer += update.delta
-                    self.chats = self.chats
+                    async with self:
+                        self.chats[self.current_chat][-1].answer += update.delta
+                        self.chats = self.chats
                 case UpdateTypes.ai_stream_tool_call:
                     pass
                 case UpdateTypes.ai_message_end:
@@ -192,12 +204,15 @@ class State(rx.State):
                 case UpdateTypes.tools_start:
                     logging.debug("Tools start update")
                     assert isinstance(update, ToolsStartUpdate)
-                    self.chats[self.current_chat][-1].answer += "\n\n---\n\nCalling tools..."
-                    self.chats[self.current_chat][-1].tool_uses.append(
-                        ToolsUse(tool_calls=update.calls)
-                    )
-                    self.chats = self.chats
-                    self.current_status = f"Calling tools: {[call.name for call in update.calls]})"
+                    async with self:
+                        self.chats[self.current_chat][-1].answer += "\n\n---\n\nCalling tools..."
+                        self.chats[self.current_chat][-1].tool_uses.append(
+                            ToolsUse(tool_calls=update.calls)
+                        )
+                        self.chats = self.chats
+                        self.current_status = (
+                            f"Calling tools: {[call.name for call in update.calls]})"
+                        )
                 case UpdateTypes.tool_end:
                     # NOTE: Get update for *each* finished tool
                     logging.debug("Tool end update")
@@ -209,8 +224,11 @@ class State(rx.State):
                     pass
                 case _:
                     logging.info(f"Unknown update type: {update.type_}")
-                    self.current_status = f"Unknown update type: {update.type_}"
+                    async with self:
+                        self.current_status = f"Unknown update type: {update.type_}"
             yield
 
-        self.current_status = ""
-        self.processing = False
+        # Reset the state after processing
+        async with self:
+            self.current_status = ""
+            self.processing = False

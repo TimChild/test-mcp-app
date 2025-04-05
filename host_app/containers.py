@@ -10,11 +10,15 @@ import logging.config
 from typing import Any
 
 from dependency_injector import containers, providers
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 from mcp_client import MultiMCPClient
 from mcp_client.multi_client import SSEConnection, StdioConnection
+
+# Load .env file into environment variables (so they can be used in config.yml)
+load_dotenv()
 
 
 def config_option_to_connections(
