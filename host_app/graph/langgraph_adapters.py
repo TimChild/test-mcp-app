@@ -32,8 +32,8 @@ from host_app.models import (
     UpdateTypes,
 )
 
-from .functional_langgraph import make_graph as make_functional_graph
-from .graph import make_graph
+from .functional_implementation import make_graph as make_functional_graph
+from .graph_implementation import make_graph as make_standard_graph
 
 
 class LgEvent(BaseModel):
@@ -80,7 +80,7 @@ class GraphAdapter:
             if use_functional_graph:
                 self.graph = make_functional_graph()
             else:
-                self.graph = make_graph()
+                self.graph = make_standard_graph()
 
         self.mcp_client = mcp_client
 
@@ -158,12 +158,11 @@ class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
                 )
                 self.streaming_messages[m_id] = m
 
+            self.update_streaming_message(m_id, m)
+
             if self.has_content_chunk(m):
                 content = self.ensure_content_is_str(m.content)
                 yield AIStreamUpdate(m_id=m_id, delta=content)
-                updated_message = self.streaming_messages[m_id] + m
-                assert isinstance(updated_message, AIMessageChunk)
-                self.streaming_messages[m_id] = updated_message
 
             if self.has_tool_call_chunk(m):
                 # Not streaming tool call part for now
@@ -179,7 +178,7 @@ class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
                 tool_response=m,
             )
         else:
-            raise GraphUpdateError(f"Expected AIMessageChunk or ToolMessage, got {type(m)}")
+            logging.error(f"Ignoring unexpected message update: {m}")
 
     @staticmethod
     def is_ai_message(m: AnyMessage) -> TypeGuard[AIMessageChunk]:
@@ -191,6 +190,9 @@ class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
 
     def is_new_ai_message(self, m_id: str) -> bool:
         return m_id not in self.streaming_messages
+
+    def update_streaming_message(self, m_id: str, m: AIMessageChunk) -> None:
+        self.streaming_messages[m_id] += m  # pyright: ignore[reportArgumentType]
 
     @staticmethod
     def has_content_chunk(m: AIMessageChunk) -> bool:
