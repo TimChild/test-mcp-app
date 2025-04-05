@@ -27,7 +27,7 @@ from .models import (
     ToolEndUpdate,
     ToolInfo,
     ToolsStartUpdate,
-    ToolUse,
+    ToolsUse,
     UpdateTypes,
 )
 
@@ -190,7 +190,7 @@ class State(rx.State):
                     assert isinstance(update, ToolsStartUpdate)
                     self.chats[self.current_chat][-1].answer += "\n\nCalling tools..."
                     self.chats[self.current_chat][-1].tool_uses.append(
-                        ToolUse(tool_names=[call.name for call in update.calls])
+                        ToolsUse(tool_calls=update.calls)
                     )
                     self.chats = self.chats
                     self.current_status = f"Calling tools: {[call.name for call in update.calls]})"

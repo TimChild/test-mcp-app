@@ -105,15 +105,15 @@ class ToolEndUpdate(rx.Base):
     tool_response: ToolMessage
 
 
-class ToolUse(rx.Base):
-    tool_names: list[str]
+class ToolsUse(rx.Base):
+    tool_calls: list[ToolCallInfo]
 
 
 class QA(rx.Base):
     """A question and answer pair."""
 
     question: str
-    tool_uses: list[ToolUse] = []
+    tool_uses: list[ToolsUse] = []
     answer: str
 
 

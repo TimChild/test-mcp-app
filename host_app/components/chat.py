@@ -2,7 +2,7 @@ import reflex as rx
 import reflex_chakra as rc
 
 from host_app.components import loading_icon
-from host_app.models import ToolUse
+from host_app.models import ToolCallInfo, ToolsUse
 from host_app.state import QA, State
 
 message_style = dict(
@@ -23,11 +23,17 @@ def message(qa: QA) -> rx.Component:
         A component displaying the question/answer pair.
     """
 
-    def render_tool_use(tool_use: ToolUse) -> rx.Component:
+    def render_tool_use(tool_use: ToolsUse) -> rx.Component:
+        def render_tool_call(tc: ToolCallInfo) -> rx.Component:
+            return rx.tooltip(
+                rx.badge(tc.name),
+                content=f"Args: {rx.Var.create(tc.args).to_string()}",
+            )
+
         return rx.box(
             rx.hstack(
                 "Calling tools:",
-                rx.foreach(tool_use.tool_names, lambda name: rx.badge(name)),
+                rx.foreach(tool_use.tool_calls, render_tool_call),
                 align="center",
                 wrap="wrap",
             ),
