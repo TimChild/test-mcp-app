@@ -1,5 +1,6 @@
 use_functional_graph: true
 default_model: "openai_gpt4o"
+db_conn: database.db
 
 logging:
   version: 1

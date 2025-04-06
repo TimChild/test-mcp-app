@@ -13,7 +13,7 @@ from dependency_injector import containers, providers
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.store.memory import InMemoryStore
 from mcp_client import MultiMCPClient
 from mcp_client.multi_client import SSEConnection, StdioConnection
@@ -93,10 +93,10 @@ class Application(containers.DeclarativeContainer):
     )
     "The main LLM model to use for completions"
 
-    checkpointer = providers.Singleton(MemorySaver)
+    checkpointer = providers.Resource(SqliteSaver.from_conn_string, config.db_conn)
     "Persistence provider for langgraph runs (e.g. enables interrupt/resume)"
 
-    store = providers.Singleton(InMemoryStore)
+    store = providers.Resource(InMemoryStore)
     "Persistence provider for langgraph data (e.g. enables persisting data between runs)"
 
     wiring_config = containers.WiringConfiguration(

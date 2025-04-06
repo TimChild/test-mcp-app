@@ -5,12 +5,14 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "aiosqlite>=0.21.0",
     "dependency-injector>=4.46.0",
     "dotenv>=0.9.9",
     "langchain-anthropic>=0.3.10",
     "langchain-mcp-adapters>=0.0.3",
     "langchain-openai>=0.3.11",
     "langgraph>=0.3.21",
+    "langgraph-checkpoint-sqlite>=2.0.6",
     "mcp-client",
     "openai>=1.14.0",
     "reflex>=0.7.0",
