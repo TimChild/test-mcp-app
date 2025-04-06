@@ -1,3 +1,5 @@
+"""Basic tests to understand how the dependency injection works with async resources."""
+
 import asyncio
 from typing import AsyncIterator, Iterator
 

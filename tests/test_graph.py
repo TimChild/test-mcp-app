@@ -1,3 +1,5 @@
+"""Tests that the graph part of the app works correctly."""
+
 import asyncio
 import uuid
 from typing import Any, Callable, Iterator, Literal, Optional, Sequence, Union
@@ -35,7 +37,7 @@ MISSING_SSE_SERVER_CONFIG = {
 
 
 class FakeChatModel(FakeMessagesListChatModel):
-    # NOTE: list-list in-case it's called multiple times
+    # Note: store list of list to record bound tools each time it is bound
     tools_bound: list[list[BaseTool]] = []
 
     def bind_tools(

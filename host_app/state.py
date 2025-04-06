@@ -164,6 +164,11 @@ class State(rx.State):
 
     @rx.event(background=True)
     async def run_request_in_background(self) -> AsyncIterator[EventType | None]:
+        """Background task to run the langgraph graph.
+
+        Required to use a background task because this could take a while to run.
+        Note: Use `async with self:` in order to update the state in the background task.
+        """
         question = self.question
 
         # Build the functional or standard graph to run

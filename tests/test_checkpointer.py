@@ -1,3 +1,9 @@
+"""
+Basic testing that the checkpointer is being provided correctly by the container.
+
+Easy to get this wrong when switching from sync MemorySaver to async sqlite/postgres savers.
+"""
+
 from typing import AsyncIterator
 
 import pytest
@@ -17,14 +23,12 @@ async def get_conn(conn: Connection = Provide[Application.conn]) -> Connection:
 async def checkpoint_getter(
     checkpointer: BaseCheckpointSaver = Provide[Application.checkpointer],
 ) -> BaseCheckpointSaver:
-    """Create a SqliteSaver instance from a connection string."""
     assert isinstance(checkpointer, BaseCheckpointSaver)
     return checkpointer
 
 
 @pytest.fixture(scope="session")
 async def application() -> AsyncIterator[Application]:
-    """Fixture to provide a container instance."""
     container = Application()
     container.wire(modules=[__name__])
     await container.init_resources()  # pyright: ignore[reportGeneralTypeIssues]
@@ -37,7 +41,6 @@ async def application() -> AsyncIterator[Application]:
 async def test_get_conn():
     """Test that the connection is available in the container."""
     conn = await get_conn()
-    assert conn is not None
     assert isinstance(conn, Connection)
 
 
@@ -45,5 +48,4 @@ async def test_get_conn():
 async def test_get_checkpointer():
     """Test that the checkpointer is available in the container."""
     checkpointer = await checkpoint_getter()
-    assert checkpointer is not None
     assert isinstance(checkpointer, BaseCheckpointSaver)
