@@ -1,22 +1,11 @@
-use_functional_graph: true
 default_model: "openai_gpt4o"
-checkpoint_db: checkpoint.db
-store_db: sqlite:///store.db
 
-logging:
-  version: 1
-  formatters:
-    formatter:
-      format: "[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s"
-  handlers:
-    console:
-      class: "logging.StreamHandler"
-      level: "INFO"
-      formatter: "formatter"
-      stream: "ext://sys.stderr"
-  root:
-    level: "INFO"
-    handlers: ["console"]
+# Used with either sqlite or postgres checkpointer
+# checkpoint_db: checkpoint.db
+# checkpoint_db: postgresql+asyncpg://postgres:password@localhost:5432/postgres
+
+# Only used with postgres store
+# store_db: postgresql+asyncpg://postgres:password@localhost:5432/postgres
 
 system_prompt: |
   You are a chatbot operating in a developer debugging environment. You can give detailed information about any information you have access to (you do not have to worry about hiding implementation details from a user).
@@ -52,6 +41,7 @@ mcp_servers:
     command: npx
     args: ["-y", "@modelcontextprotocol/server-filesystem", "~/mcp_allowed/"]
 
+# Make sure these are set in a `.env` file or in your environment
 secrets:
   # https://console.anthropic.com/settings/keys
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
@@ -59,3 +49,18 @@ secrets:
   OPENAI_API_KEY: ${OPENAI_API_KEY}
   # https://github.com/settings/personal-access-tokens/new
   GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PERSONAL_ACCESS_TOKEN}
+
+logging:
+  version: 1
+  formatters:
+    formatter:
+      format: "[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s"
+  handlers:
+    console:
+      class: "logging.StreamHandler"
+      level: "INFO"
+      formatter: "formatter"
+      stream: "ext://sys.stderr"
+  root:
+    level: "INFO"
+    handlers: ["console"]

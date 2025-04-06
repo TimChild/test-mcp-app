@@ -9,20 +9,18 @@ configuration in a single config file.
 import logging.config
 from typing import Any
 
-import aiosqlite
-
+# import aiosqlite
 # import psycopg
 # import psycopg.rows
-from dependency_injector import containers, providers, resources
+from dependency_injector import containers, providers
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
-
-# from langgraph.checkpoint.memory import MemorySaver
-# from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver, AsyncShallowPostgresSaver
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.store.memory import InMemoryStore
 
+# from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver, AsyncShallowPostgresSaver
+# from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 # from langgraph.store.postgres import AsyncPostgresStore
 from mcp_client import MultiMCPClient
 from mcp_client.multi_client import SSEConnection, StdioConnection
@@ -67,17 +65,19 @@ def config_option_to_connections(
     return connections
 
 
-class AsyncSqliteConn(resources.AsyncResource):
-    async def init(self, conn_string: str) -> aiosqlite.Connection:
-        """Initialize the checkpointer with the given connection string."""
-        conn = aiosqlite.connect(conn_string)
-        return await conn
+## For Sqlite checkpointer (no store)
+# class AsyncSqliteConn(resources.AsyncResource):
+#     async def init(self, conn_string: str) -> aiosqlite.Connection:
+#         """Initialize the checkpointer with the given connection string."""
+#         conn = aiosqlite.connect(conn_string)
+#         return await conn
+#
+#     async def shutdown(self, resource: Any) -> None:  # noqa: ANN401
+#         assert isinstance(resource, aiosqlite.Connection)
+#         await resource.close()
 
-    async def shutdown(self, resource: Any) -> None:  # noqa: ANN401
-        assert isinstance(resource, aiosqlite.Connection)
-        await resource.close()
 
-
+## For Postgres checkpointer and store
 # class AsyncPostgresConn(resources.AsyncResource):
 #     async def init(self, conn_string: str) -> psycopg.AsyncConnection:
 #         """Initialize the checkpointer with the given connection string."""
@@ -129,15 +129,14 @@ class Application(containers.DeclarativeContainer):
     )
     "The main LLM model to use for completions"
 
-    # For longer persistence a database is required
-    conn = providers.Resource(AsyncSqliteConn, config.checkpoint_db)
+    ## For longer persistence a database is required
+    # conn = providers.Resource(AsyncSqliteConn, config.checkpoint_db)
     # conn = providers.Resource(AsyncPostgresConn, config.checkpoint_db)
     "Connection to the database for persistent storage"
 
-    # CHECKPOINTERS -- For persistence of langgraph runs
-    # checkpointer = providers.Resource(MemorySaver)
-    # Then use one of the following checkpointers depending on db choice
-    checkpointer = providers.Resource(AsyncSqliteSaver, conn=conn)
+    ## CHECKPOINTERS -- For persistence of langgraph runs
+    checkpointer = providers.Resource(MemorySaver)
+    # checkpointer = providers.Resource(AsyncSqliteSaver, conn=conn)
     # checkpointer = providers.Resource(AsyncPostgresSaver, conn=conn)
     # checkpointer = providers.Resource(AsyncShallowPostgresSaver, conn=conn)  # No timetravel
     "Persistence provider for langgraph runs (e.g. enables interrupt/resume)"
