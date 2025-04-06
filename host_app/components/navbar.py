@@ -127,11 +127,15 @@ def connected_mcp_server_infos() -> rx.Component:
 
 
 def graph_mode_selection() -> rx.Component:
-    return rx.select(
-        ["functional", "standard"],
-        default_value=State.graph_mode,
-        on_change=State.set_graph_mode,
-        placeholder="Graph mode",
+    return rx.hstack(
+        "Graph mode:",
+        rx.select(
+            ["functional", "standard"],
+            default_value=State.graph_mode,
+            on_change=State.set_graph_mode,
+            placeholder="Graph mode",
+        ),
+        align="center",
     )
 
 
@@ -140,7 +144,15 @@ def model_selection(
     llm_models: dict[str, Any] = Provide[Application.llm_models],
     default: str = Provide[Application.config.default_model],
 ) -> rx.Component:
-    return rx.select(list(llm_models.keys()), default_value=default, on_change=State.set_model)
+    return rx.hstack(
+        "Model:",
+        rx.select(
+            list(llm_models.keys()),
+            default_value=default,
+            on_change=State.set_model,
+        ),
+        align="center",
+    )
 
 
 def navbar() -> rx.Component:
@@ -159,8 +171,6 @@ def navbar() -> rx.Component:
                         variant="soft",
                     )
                 ),
-                rx.text(f"test: {State.test_var}"),
-                rx.button("test-trigger", on_click=State.test_handler),
                 align_items="center",
             ),
             rx.hstack(
