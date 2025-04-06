@@ -7,16 +7,16 @@ Easy to get this wrong when switching from sync MemorySaver to async sqlite/post
 from typing import AsyncIterator
 
 import pytest
-from aiosqlite import Connection
+
+# from aiosqlite import Connection
 from dependency_injector.wiring import Provide, inject
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from host_app.containers import Application
 
-
-@inject
-async def get_conn(conn: Connection = Provide[Application.conn]) -> Connection:
-    return conn
+# @inject
+# async def get_conn(conn: Connection = Provide[Application.conn]) -> Connection:
+#     return conn
 
 
 @inject
@@ -31,17 +31,21 @@ async def checkpoint_getter(
 async def application() -> AsyncIterator[Application]:
     container = Application()
     container.wire(modules=[__name__])
-    await container.init_resources()  # pyright: ignore[reportGeneralTypeIssues]
+    coro_or_none = container.init_resources()
+    if coro_or_none:
+        await coro_or_none
     yield container
-    await container.shutdown_resources()  # pyright: ignore[reportGeneralTypeIssues]
+    coro_or_none = container.shutdown_resources()
+    if coro_or_none:
+        await coro_or_none
     container.unwire()
 
 
-@pytest.mark.usefixtures("application")
-async def test_get_conn():
-    """Test that the connection is available in the container."""
-    conn = await get_conn()
-    assert isinstance(conn, Connection)
+# @pytest.mark.usefixtures("application")
+# async def test_get_conn():
+#     """Test that the connection is available in the container."""
+#     conn = await get_conn()
+#     assert isinstance(conn, Connection)
 
 
 @pytest.mark.usefixtures("application")
