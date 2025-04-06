@@ -22,8 +22,7 @@ from langgraph.store.memory import InMemoryStore
 # from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver, AsyncShallowPostgresSaver
 # from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 # from langgraph.store.postgres import AsyncPostgresStore
-from mcp_client import MultiMCPClient
-from mcp_client.multi_client import SSEConnection, StdioConnection
+from host_app.mcp_client import MultiMCPClient, SSEConnection, StdioConnection
 
 # Load .env file into environment variables (so they can be used in config.yml)
 load_dotenv()

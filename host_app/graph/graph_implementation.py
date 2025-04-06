@@ -24,10 +24,10 @@ from langgraph.prebuilt import ToolNode
 from langgraph.store.base import BaseStore
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
-from mcp_client import MultiMCPClient
 from pydantic import BaseModel
 
 from host_app.containers import Application
+from host_app.mcp_client import MultiMCPClient
 from host_app.models import InputState
 
 

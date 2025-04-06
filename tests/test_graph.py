@@ -16,11 +16,11 @@ from langgraph.graph.graph import CompiledGraph
 from langgraph.pregel import Pregel
 from langgraph.store.base import BaseStore, Item
 from langgraph.store.memory import InMemoryStore
-from mcp_client import MultiMCPClient
 
 from host_app.containers import Application, config_option_to_connections
 from host_app.graph import GraphRunAdapter, make_functional_graph, make_standard_graph
 from host_app.graph.functional_implementation import OutputState
+from host_app.mcp_client import MultiMCPClient
 from host_app.models import GraphUpdate, InputState, UpdateTypes
 
 EXAMPLE_SERVER_CONFIG = {

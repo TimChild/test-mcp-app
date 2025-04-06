@@ -1,9 +1,22 @@
 [project]
 name = "host-app"
 version = "0.1.0"
-description = "Add your description here"
+description = "A demonstration reflex chat app utilizing MCP servers with LangGraph."
 readme = "README.md"
 requires-python = ">=3.13"
+authors = [
+    { name = "Tim Child", email = "timjchild@gmail.com" }
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Typing :: Typed",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    # "Framework :: Reflex",  # Should be added once this is accepted
+]
 dependencies = [
     "aiosqlite>=0.21.0",
     "dependency-injector>=4.46.0",
@@ -14,7 +27,6 @@ dependencies = [
     "langgraph>=0.3.21",
     # "langgraph-checkpoint-postgres>=2.0.19",
     "langgraph-checkpoint-sqlite>=2.0.6",
-    "mcp-client",
     "openai>=1.14.0",
     # "psycopg2-binary>=2.9.10",
     "reflex>=0.7.0",
@@ -29,7 +41,7 @@ select = ["E4", "E7", "E9", "F", "I", "ANN"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/*" = [
-    "ANN201",
+    "ANN201",  # No return type
     "ANN401",  # Any for kwargs
 ]
 
@@ -40,7 +52,6 @@ venv = ".venv"
 
 [dependency-groups]
 dev = [
-    "jupyterlab>=4.3.6",
     "pre-commit>=4.2.0",
     "pyright>=1.1.398",
     "pytest>=8.3.5",
@@ -63,6 +74,3 @@ filterwarnings = [
     "ignore::RuntimeWarning:pydantic.v1.main",
 
 ]
-
-[tool.uv.sources]
-mcp-client = { path = "../mcp-client" , editable = true }

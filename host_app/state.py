@@ -10,11 +10,11 @@ from typing import Any, AsyncIterator, Mapping, Sequence
 import reflex as rx
 from dependency_injector.wiring import Provide, inject
 from langchain_core.tools import BaseTool
-from mcp_client import MultiMCPClient
 from reflex.event import EventType
 
 from host_app.containers import Application
 from host_app.graph import GraphRunAdapter, make_functional_graph, make_standard_graph
+from host_app.mcp_client import MultiMCPClient
 
 from .models import (
     QA,

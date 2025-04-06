@@ -22,11 +22,11 @@ from langchain_core.messages import (
 )
 from langchain_core.runnables import RunnableConfig
 from langgraph.pregel import Pregel
-from mcp_client import MultiMCPClient
 from pydantic import BaseModel
 
 from host_app.containers import Application
 from host_app.graph.functional_implementation import OutputState
+from host_app.mcp_client import MultiMCPClient
 from host_app.models import (
     AIEndUpdate,
     AIStartUpdate,
