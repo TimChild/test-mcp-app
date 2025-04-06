@@ -8,6 +8,7 @@ from langchain_core.language_models.fake_chat_models import FakeMessagesListChat
 from langchain_core.messages import AIMessage, BaseMessage, ToolCall, ToolMessage
 from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.graph import CompiledGraph
 from langgraph.pregel import Pregel
@@ -119,6 +120,7 @@ def basic_runnable_config() -> RunnableConfig:
 async def test_compile_graph():
     graph = await make_standard_graph()
     assert isinstance(graph, CompiledGraph)
+    assert isinstance(graph.checkpointer, BaseCheckpointSaver)
 
 
 @pytest.fixture(params=["standard", "functional"])

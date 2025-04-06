@@ -12,9 +12,11 @@ dependencies = [
     "langchain-mcp-adapters>=0.0.3",
     "langchain-openai>=0.3.11",
     "langgraph>=0.3.21",
+    # "langgraph-checkpoint-postgres>=2.0.19",
     "langgraph-checkpoint-sqlite>=2.0.6",
     "mcp-client",
     "openai>=1.14.0",
+    # "psycopg2-binary>=2.9.10",
     "reflex>=0.7.0",
     "reflex-chakra>=0.7.0",
 ]
