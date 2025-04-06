@@ -85,7 +85,7 @@ class Application(containers.DeclarativeContainer):
             model="gpt-4o",
             api_key=config.secrets.OPENAI_API_KEY,
         ),
-        antropic_claude_sonnet=providers.Factory(
+        anthropic_claude_sonnet=providers.Factory(
             ChatAnthropic,
             model="claude-3-7-sonnet-latest",
             api_key=config.secrets.ANTHROPIC_API_KEY,

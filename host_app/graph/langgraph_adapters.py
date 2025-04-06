@@ -40,6 +40,11 @@ from host_app.models import (
     UpdateTypes,
 )
 
+STOP_KEYS = [
+    "finish_reason",  # openai
+    "stop_reason",  # anthropic
+]
+
 
 class LgEvent(BaseModel):
     """Structure of event emitted by langgraph."""
@@ -89,7 +94,7 @@ class GraphRunAdapter:
     async def astream_updates(
         self,
         input: BaseModel,
-        llm_model: Literal["openai_gpt4o", "antropic_claude_sonnet"] | None = None,
+        llm_model: Literal["openai_gpt4o", "anthropic_claude_sonnet"] | None = None,
         thread_id: str | None = None,
         events_to_updates_handler: EventsToUpdatesHandlerProtocol | None = None,
     ) -> AsyncIterator[GraphUpdate]:
@@ -224,13 +229,40 @@ class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
 
     @staticmethod
     def has_content_chunk(m: AIMessageChunk) -> bool:
-        return True if m.content else False
+        if not m.content:
+            return False
+        # Openai content
+        if isinstance(m.content, str):
+            return True
+        # Anthropics content
+        if (
+            isinstance(m.content, list)
+            and len(m.content) == 1
+            and isinstance(m.content[0], dict)
+            and "type" in m.content[0]
+        ):
+            type_ = m.content[0]["type"]
+            match type_:
+                case "text":
+                    return True
+                case "tool_use":
+                    return False
+        raise GraphUpdateError(f"Unexpected ai content, got {m.content}")
 
     @staticmethod
     def ensure_content_is_str(content: str | list[str | dict]) -> str:
-        if not isinstance(content, str):
-            raise GraphUpdateError(f"Expected str content, got {type(content)}")
-        return content
+        # Openai returns strings
+        if isinstance(content, str):
+            return content
+        # Anthropic returns list of dicts
+        if (
+            isinstance(content, list)
+            and len(content) == 1
+            and isinstance(content[0], dict)
+            and "text" in content[0]
+        ):
+            return content[0]["text"]
+        raise GraphUpdateError(f"Unexpected ai content, got {content}")
 
     @staticmethod
     def has_tool_call_chunk(m: AIMessageChunk) -> bool:
@@ -238,7 +270,11 @@ class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
 
     @staticmethod
     def is_message_finish(m: AIMessageChunk) -> bool:
-        return m.response_metadata.get("finish_reason", None) is not None
+        # Check if any of the stop keys are present and have a non-null value
+        for key in STOP_KEYS:
+            if key in m.response_metadata and m.response_metadata[key] is not None:
+                return True
+        return False
 
     @staticmethod
     def has_tool_calls(m: AIMessage) -> bool:
