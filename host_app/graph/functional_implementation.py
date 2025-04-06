@@ -111,7 +111,7 @@ class OutputState(BaseModel):
 
 
 @inject
-def make_graph(
+async def make_graph(
     checkpointer: BaseCheckpointSaver = Provide[Application.checkpointer],
     store: BaseStore = Provide[Application.store],
     system_prompt: str = Provide[Application.config.system_prompt],

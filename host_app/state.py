@@ -168,7 +168,9 @@ class State(rx.State):
 
         # Build the functional or standard graph to run
         graph = (
-            make_functional_graph() if self.graph_mode == "functional" else make_standard_graph()
+            await make_functional_graph()
+            if self.graph_mode == "functional"
+            else await make_standard_graph()
         )
 
         # (since we get updates per tool, we can only check that all tools are done when we

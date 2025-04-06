@@ -71,12 +71,14 @@ class NotSetModel:
 @pytest.fixture(autouse=True, scope="session")
 def container() -> Iterator[Application]:
     container = Application()
+    container.wire()
     container.config.from_yaml("config.yml")
     with container.config.mcp_servers.override({"example_server": EXAMPLE_SERVER_CONFIG}):
         with container.llm_models.override({container.config.default_model(): NotSetModel()}):
             with container.store.override(InMemoryStore()):
                 with container.checkpointer.override(MemorySaver()):
                     yield container
+    container.unwire()
 
 
 def test_container(container: Application):
@@ -114,18 +116,18 @@ def basic_runnable_config() -> RunnableConfig:
     }
 
 
-def test_compile_graph():
-    graph = make_standard_graph()
+async def test_compile_graph():
+    graph = await make_standard_graph()
     assert isinstance(graph, CompiledGraph)
 
 
 @pytest.fixture(params=["standard", "functional"])
-def graph(request: pytest.FixtureRequest, mock_chat_model: FakeChatModel) -> Pregel:
+async def graph(request: pytest.FixtureRequest, mock_chat_model: FakeChatModel) -> Pregel:
     _ = mock_chat_model
     if request.param == "functional":
-        return make_functional_graph()
+        return await make_functional_graph()
     else:
-        return make_standard_graph()
+        return await make_standard_graph()
 
 
 async def test_invoke_graph(graph: Pregel, basic_runnable_config: RunnableConfig):

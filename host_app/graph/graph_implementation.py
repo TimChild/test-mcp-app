@@ -147,7 +147,7 @@ async def call_tools(
 
 
 @inject
-def make_graph(
+async def make_graph(
     checkpointer: BaseCheckpointSaver | None = Provide[Application.checkpointer],
     store: BaseStore | None = Provide[Application.store],
     debug_mode: bool = False,

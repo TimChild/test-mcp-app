@@ -9,7 +9,8 @@ configuration in a single config file.
 import logging.config
 from typing import Any
 
-from dependency_injector import containers, providers
+import aiosqlite
+from dependency_injector import containers, providers, resources
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
@@ -58,6 +59,17 @@ def config_option_to_connections(
     return connections
 
 
+class AsyncConn(resources.AsyncResource):
+    async def init(self, conn_string: str) -> aiosqlite.Connection:
+        """Initialize the checkpointer with the given connection string."""
+        conn = aiosqlite.connect(conn_string)
+        return await conn
+
+    async def shutdown(self, resource: Any) -> None:  # noqa: ANN401
+        assert isinstance(resource, aiosqlite.Connection)
+        await resource.close()
+
+
 class Application(containers.DeclarativeContainer):
     """The main application container for dependency injection."""
 
@@ -94,8 +106,8 @@ class Application(containers.DeclarativeContainer):
     "The main LLM model to use for completions"
 
     # checkpointer = providers.Resource(MemorySaver)
-    # checkpointer = providers.Resource(SqliteSaver.from_conn_string, config.db_conn)
-    checkpointer = providers.Resource(AsyncSqliteSaver.from_conn_string, config.db_conn)
+    conn = providers.Resource(AsyncConn, config.db_conn)
+    checkpointer = providers.Resource(AsyncSqliteSaver, conn=conn)
     "Persistence provider for langgraph runs (e.g. enables interrupt/resume)"
 
     store = providers.Resource(InMemoryStore)
@@ -108,6 +120,7 @@ class Application(containers.DeclarativeContainer):
             ".components.navbar",
         ],
         packages=[".graph"],
+        auto_wire=False,
     )
     """Configures the dependency injection wiring for the application. I.e., which modules/packages
     require injections to be performed."""

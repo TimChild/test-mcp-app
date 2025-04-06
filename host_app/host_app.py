@@ -1,6 +1,8 @@
 """Initialize the Reflex app and dependecy injector container."""
 
 import logging
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
 import reflex as rx
 import reflex_chakra as rc
@@ -37,12 +39,27 @@ def check_secrets_not_null(secrets: dict[str, str]) -> None:
             raise ValueError(f"Missing secret: {k}")
 
 
+@asynccontextmanager
+async def lifespan(container: Application) -> AsyncIterator[None]:
+    """Lifespan function for the app.
+
+    Before yield runs as app starts up, after yield runs as app shuts down.
+    """
+    coro_or_none = container.init_resources()
+    if coro_or_none:
+        await coro_or_none
+    yield
+    coro_or_none = container.shutdown_resources()
+    if coro_or_none:
+        await coro_or_none
+
+
 def make_app() -> rx.App:
+    # Add state and page to the app.
     container = Application()
-    container.init_resources()
+    container.wire()
     check_secrets_not_null(container.config.secrets())
 
-    # Add state and page to the app.
     app = rx.App(
         theme=rx.theme(
             appearance="dark",
@@ -50,6 +67,7 @@ def make_app() -> rx.App:
         ),
     )
     app.add_page(index, on_load=[State.on_load])
+    app.register_lifespan_task(lifespan, container=container)
     return app
 
 

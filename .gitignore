@@ -10,6 +10,7 @@ assets/external/
 **/package-lock.json
 **/package.json
 *.db
+*.db*
 *.py[cod]
 .vscode
 .web
