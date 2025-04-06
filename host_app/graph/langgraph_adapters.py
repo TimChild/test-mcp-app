@@ -94,7 +94,7 @@ class GraphRunAdapter:
     async def astream_updates(
         self,
         input: BaseModel,
-        llm_model: Literal["openai_gpt4o", "anthropic_claude_sonnet"] | None = None,
+        llm_model: str | None = None,
         thread_id: str | None = None,
         events_to_updates_handler: EventsToUpdatesHandlerProtocol | None = None,
     ) -> AsyncIterator[GraphUpdate]:
@@ -187,8 +187,8 @@ class MessagesStreamHandler(EventsToUpdatesHandlerProtocol):
                     m_id=m_id, metadata=GraphMetadata(node=lg_metadata["langgraph_node"])
                 )
                 self.streaming_messages[m_id] = m
-
-            self.update_streaming_message(m_id, m)
+            else:
+                self.update_streaming_message(m_id, m)
 
             if self.has_content_chunk(m):
                 content = self.ensure_content_is_str(m.content)
