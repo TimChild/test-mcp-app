@@ -3,9 +3,7 @@
 I.e. the dynamic behavior of the app.
 """
 
-import asyncio
 import logging
-import time
 import uuid
 from typing import Any, AsyncIterator, Mapping, Sequence
 
@@ -42,8 +40,6 @@ DEFAULT_CHATS = {
 class State(rx.State):
     """The app state."""
 
-    test_var: int = 0
-
     chats: dict[str, list[QA]] = DEFAULT_CHATS
     """A dict from the chat name to the list of questions and answers."""
 
@@ -69,7 +65,7 @@ class State(rx.State):
     """The connected MCP servers."""
 
     graph_mode: str = "functional"  # functional or standard
-    model_name: str | None = None
+    model_name: str = ""
 
     @rx.event
     def set_new_chat_name(self, name: str) -> None:
@@ -148,14 +144,6 @@ class State(rx.State):
         return list(self.chats.keys())
 
     @rx.event
-    async def test_handler(self) -> AsyncIterator[EventType]:
-        t = time.time()
-        while time.time() - t < 5:
-            self.test_var += 1
-            yield rx.toast.info(f"Test var: {self.test_var}")
-            await asyncio.sleep(0.5)
-
-    @rx.event
     async def handle_send_click(self, form_data: dict[str, Any]) -> EventType | None:
         """Handle user clicking the send button."""
         # Get the question from the form
@@ -191,7 +179,7 @@ class State(rx.State):
         async for update in GraphRunAdapter(graph).astream_updates(
             input=InputState(question=question, conversation_id=self.current_chat),
             thread_id=str(uuid.uuid4()),
-            llm_model=self.model_name,
+            llm_model=self.model_name if self.model_name else None,
         ):
             update: GraphUpdate
             match update.type_:
