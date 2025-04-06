@@ -7,7 +7,7 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Any, AsyncIterator, Literal, Mapping, Sequence
+from typing import Any, AsyncIterator, Mapping, Sequence
 
 import reflex as rx
 from dependency_injector.wiring import Provide, inject
@@ -68,10 +68,8 @@ class State(rx.State):
     mcp_servers: list[McpServerInfo] = []
     """The connected MCP servers."""
 
-    graph_mode: Literal["functional", "standard"] = "functional"
-    model_name: Literal["openai_gpt4o", "anthropic_claude_sonnet"] | None = (
-        "anthropic_claude_sonnet"
-    )
+    graph_mode: str = "functional"  # functional or standard
+    model_name: str | None = None
 
     @rx.event
     def set_new_chat_name(self, name: str) -> None:
@@ -110,6 +108,25 @@ class State(rx.State):
             chat_name: The name of the chat.
         """
         self.current_chat = chat_name
+
+    @rx.event
+    def set_model(self, model_name: str) -> None:
+        """Set the model name.
+
+        Args:
+            model_name: The name of the model.
+        """
+        self.model_name = model_name
+
+    @rx.event
+    def set_graph_mode(self, graph_mode: str) -> None:
+        """Set the graph mode.
+
+        Args:
+            graph_mode: The graph mode.
+        """
+        assert graph_mode in ["functional", "standard"]
+        self.graph_mode = graph_mode  # type: ignore[reportAttributeAccessIssue]
 
     @rx.event
     @inject

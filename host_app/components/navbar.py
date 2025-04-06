@@ -1,5 +1,9 @@
-import reflex as rx
+from typing import Any
 
+import reflex as rx
+from dependency_injector.wiring import Provide, inject
+
+from host_app.containers import Application
 from host_app.models import McpServerInfo, ToolInfo
 from host_app.state import State
 
@@ -122,6 +126,23 @@ def connected_mcp_server_infos() -> rx.Component:
     )
 
 
+def graph_mode_selection() -> rx.Component:
+    return rx.select(
+        ["functional", "standard"],
+        default_value=State.graph_mode,
+        on_change=State.set_graph_mode,
+        placeholder="Graph mode",
+    )
+
+
+@inject
+def model_selection(
+    llm_models: dict[str, Any] = Provide[Application.llm_models],
+    default: str = Provide[Application.config.default_model],
+) -> rx.Component:
+    return rx.select(list(llm_models.keys()), default_value=default, on_change=State.set_model)
+
+
 def navbar() -> rx.Component:
     return rx.box(
         rx.hstack(
@@ -143,6 +164,8 @@ def navbar() -> rx.Component:
                 align_items="center",
             ),
             rx.hstack(
+                graph_mode_selection(),
+                model_selection(),
                 connected_mcp_server_infos(),
                 modal(rx.button("+ New chat")),
                 sidebar(

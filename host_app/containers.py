@@ -103,6 +103,7 @@ class Application(containers.DeclarativeContainer):
         modules=[
             ".host_app",
             ".state",
+            ".components.navbar",
         ],
         packages=[".graph"],
     )
