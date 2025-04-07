@@ -1,3 +1,5 @@
+# THIS REPO HAS MOVED TO [TimChild/reflex-clerk-mcp](https://github.com/TimChild/reflex-clerk-mcp)
+
 # Reflex MCP Chat App
 
 A starting point for a highly customizable Python web application that uses LLMs with access to MCP (Model context protocol) servers to build a highly capable chat application.
